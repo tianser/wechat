@@ -1,0 +1,236 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+Array	myepoll.py	/^from multiprocessing import Process,Queue,Pool, Manager, Value, Array$/;"	i
+ConfigParser	common.py	/^import ConfigParser$/;"	i
+ConfigParser	weixin.py	/^import ConfigParser$/;"	i
+Epoll	epoll.py	/^class Epoll(object):$/;"	c
+Epoll	myepoll.py	/^class Epoll(object):$/;"	c
+GetWhiteName	common.py	/^	def GetWhiteName(self):$/;"	m	class:Global
+Global	common.py	/^class Global(object):$/;"	c
+Global	weixin.py	/^class Global(object):$/;"	c
+Log	common.py	/^from log import Log as Log$/;"	i
+Log	epoll.py	/^from log import Log as Log$/;"	i
+Log	log.py	/^Log = logging.getLogger('wechat')$/;"	v
+Log	myepoll.py	/^from common import Log as Log$/;"	i
+Log	wechat_client.py	/^from log import Log as Log$/;"	i
+Manager	epoll.py	/^from multiprocessing import Process,Queue,Pool, Manager$/;"	i
+Manager	myepoll.py	/^from multiprocessing import Process,Queue,Pool, Manager, Value, Array$/;"	i
+Manager	weixin.py	/^from multiprocessing import Process, Manager, Value$/;"	i
+MultipartEncoder	weixin.py	/^from requests_toolbelt.multipart.encoder import MultipartEncoder$/;"	i
+Mypost	test.py	/^def Mypost(url, params, jsonfmt=True, optional_headers={}):$/;"	f
+ParserArg	common.py	/^	def ParserArg(self):$/;"	m	class:Global
+ParserArg	weixin.py	/^    def ParserArg(self):$/;"	m	class:Global
+Pool	epoll.py	/^from multiprocessing import Process,Queue,Pool, Manager$/;"	i
+Pool	myepoll.py	/^from multiprocessing import Process,Queue,Pool, Manager, Value, Array$/;"	i
+PostMsg	wechat_client.py	/^	def PostMsg(self, word, to='filehelper'):$/;"	m	class:WebWeChat
+Process	epoll.py	/^from multiprocessing import Process,Queue,Pool, Manager$/;"	i
+Process	myepoll.py	/^from multiprocessing import Process,Queue,Pool, Manager, Value, Array$/;"	i
+Process	weixin.py	/^from multiprocessing import Process, Manager, Value$/;"	i
+Queue	agent.py	/^import Queue,os$/;"	i
+Queue	epoll.py	/^from multiprocessing import Process,Queue,Pool, Manager$/;"	i
+Queue	myepoll.py	/^from multiprocessing import Process,Queue,Pool, Manager, Value, Array$/;"	i
+Queue	myepoll.py	/^import Queue$/;"	i
+UnicodeStreamFilter	weixin.py	/^class UnicodeStreamFilter:$/;"	c
+Value	myepoll.py	/^from multiprocessing import Process,Queue,Pool, Manager, Value, Array$/;"	i
+Value	weixin.py	/^from multiprocessing import Process, Manager, Value$/;"	i
+WebWeChat	wechat_client.py	/^class WebWeChat(object):$/;"	c
+WebWeChatSync	wechat_client.py	/^	def WebWeChatSync(self):$/;"	m	class:WebWeChat
+WebWeixin	weixin.py	/^class WebWeixin(object):$/;"	c
+Wechat	wechat_client.py	/^	Wechat = WebWeChat()$/;"	v	class:WebWeChat
+__init__	common.py	/^	def __init__(self, configFile='.\/wechat.ini'):$/;"	m	class:Global
+__init__	epoll.py	/^	def __init__(self, port=9999):$/;"	m	class:Epoll
+__init__	myepoll.py	/^    def __init__(self):$/;"	m	class:Epoll
+__init__	wechat_client.py	/^	def __init__(self):$/;"	m	class:WebWeChat
+__init__	weixin.py	/^    def __init__(self):$/;"	m	class:WebWeixin
+__init__	weixin.py	/^    def __init__(self, configFile='.\/wechat.ini'):$/;"	m	class:Global
+__init__	weixin.py	/^    def __init__(self, target):$/;"	m	class:UnicodeStreamFilter
+__str__	weixin.py	/^    def __str__(self):$/;"	m	class:WebWeixin	file:
+_decode_dict	common.py	/^def _decode_dict(data): $/;"	f
+_decode_dict	weixin.py	/^def _decode_dict(data):$/;"	f
+_decode_list	common.py	/^def _decode_list(data):$/;"	f
+_decode_list	weixin.py	/^def _decode_list(data):$/;"	f
+_echo	weixin.py	/^    def _echo(self, str):$/;"	m	class:WebWeixin
+_genQRCode	common.py	/^def _genQRCode(uuid, url='https:\/\/login.weixin.qq.com\/l\/'):$/;"	f
+_get	common.py	/^def _get(url, api=None):$/;"	f
+_get	weixin.py	/^    def _get(self, url, api=None):$/;"	m	class:WebWeixin
+_post	common.py	/^def _post(url, params, jsonfmt=True):$/;"	f
+_post	weixin.py	/^    def _post(self, url, params, jsonfmt=True):$/;"	m	class:WebWeixin
+_printQR	weixin.py	/^    def _printQR(self, mat):$/;"	m	class:WebWeixin
+_run	weixin.py	/^    def _run(self, str, func, *args):$/;"	m	class:WebWeixin
+_safe_open	weixin.py	/^    def _safe_open(self, path):$/;"	m	class:WebWeixin
+_saveFile	weixin.py	/^    def _saveFile(self, filename, data, api=None):$/;"	m	class:WebWeixin
+_searchContent	weixin.py	/^    def _searchContent(self, key, content, fmat='attr'):$/;"	m	class:WebWeixin
+_showMsg	weixin.py	/^    def _showMsg(self, message):$/;"	m	class:WebWeixin
+_showQRCodeImg	weixin.py	/^    def _showQRCodeImg(self):$/;"	m	class:WebWeixin
+_simsimi	weixin.py	/^    def _simsimi(self, word):$/;"	m	class:WebWeixin
+_str2qr	weixin.py	/^    def _str2qr(self, str):$/;"	m	class:WebWeixin
+_transcoding	weixin.py	/^    def _transcoding(self, data):$/;"	m	class:WebWeixin
+_xiaodoubi	weixin.py	/^    def _xiaodoubi(self, word):$/;"	m	class:WebWeixin
+arr	myepoll.py	/^    arr = Array('i',[0, 0])$/;"	v
+bind_and_listen	epoll.py	/^	def bind_and_listen(self):$/;"	m	class:Epoll
+catchKeyboardInterrupt	weixin.py	/^def catchKeyboardInterrupt(fn):$/;"	f
+coloredlogs	weixin.py	/^    import coloredlogs$/;"	i
+commands	common.py	/^import commands $/;"	i
+common	epoll.py	/^import common$/;"	i
+common	myepoll.py	/^import common$/;"	i
+common	wechat_client.py	/^import common$/;"	i
+common	weixin.py	/^import common$/;"	i
+config	log.py	/^import logging.config $/;"	i
+cookielib	wechat_client.py	/^import cookielib $/;"	i
+cookielib	weixin.py	/^import cookielib$/;"	i
+data	agent.py	/^            data = socket.recv(1024)$/;"	v
+defaultdict	weixin.py	/^from collections import defaultdict$/;"	i
+dom	wechat_client.py	/^import xml.dom.minidom$/;"	i
+dom	weixin.py	/^import xml.dom.minidom$/;"	i
+epoll	agent.py	/^epoll = select.epoll()$/;"	v
+epoll_destroy	epoll.py	/^	def epoll_destroy(self):$/;"	m	class:Epoll
+errno	epoll.py	/^import errno$/;"	i
+errno	myepoll.py	/^import select, errno$/;"	i
+events	agent.py	/^  events = epoll.poll(timeout)$/;"	v
+fd_to_socket	agent.py	/^fd_to_socket = {serversocket.fileno():serversocket,}$/;"	v
+flush	weixin.py	/^    def flush(self):$/;"	m	class:UnicodeStreamFilter
+g_val	epoll.py	/^	g_val = common.Global()$/;"	v
+g_val	myepoll.py	/^    g_val = common.Global()$/;"	v
+g_val	wechat_client.py	/^	g_val = common.Global()$/;"	v	class:WebWeChat
+g_val	weixin.py	/^    g_val = Global()$/;"	v
+genQRCode	weixin.py	/^    def genQRCode(self):$/;"	m	class:WebWeixin
+getGroupID	weixin.py	/^    def getGroupID(self, name):$/;"	m	class:WebWeixin
+getGroupName	weixin.py	/^    def getGroupName(self, id):$/;"	m	class:WebWeixin
+getNameById	weixin.py	/^    def getNameById(self, id):$/;"	m	class:WebWeixin
+getUSerID	weixin.py	/^    def getUSerID(self, name):$/;"	m	class:WebWeixin
+getUUID	wechat_client.py	/^	def getUUID(self):$/;"	m	class:WebWeChat
+getUUID	weixin.py	/^    def getUUID(self):$/;"	m	class:WebWeixin
+getUserRemarkName	wechat_client.py	/^	def getUserRemarkName(self, id):$/;"	m	class:WebWeChat
+getUserRemarkName	weixin.py	/^    def getUserRemarkName(self, id):$/;"	m	class:WebWeixin
+handleMsg	wechat_client.py	/^	def handleMsg(self, r):$/;"	m	class:WebWeChat
+handleMsg	weixin.py	/^    def handleMsg(self, r):$/;"	m	class:WebWeixin
+handle_event	epoll.py	/^	def handle_event(self, recv, send): $/;"	m	class:Epoll
+hanle_event	myepoll.py	/^    def hanle_event(self):$/;"	m	class:Epoll
+html	wechat_client.py	/^from lxml import html$/;"	i
+html	weixin.py	/^from lxml import html$/;"	i
+json	common.py	/^import json$/;"	i
+json	test.py	/^import json$/;"	i
+json	wechat_client.py	/^import json$/;"	i
+json	weixin.py	/^import json$/;"	i
+listenMsgMode	wechat_client.py	/^	def listenMsgMode(self):$/;"	m	class:WebWeChat
+listenMsgMode	weixin.py	/^    def listenMsgMode(self):$/;"	m	class:WebWeixin
+logger	weixin.py	/^    logger = logging.getLogger(__name__)$/;"	v
+logging	log.py	/^import logging$/;"	i
+logging	log.py	/^import logging.config $/;"	i
+logging	weixin.py	/^import logging$/;"	i
+login	wechat_client.py	/^	def login(self):$/;"	m	class:WebWeChat
+login	weixin.py	/^    def login(self):$/;"	m	class:WebWeixin
+manager	epoll.py	/^	manager = Manager()$/;"	v
+message_queues	agent.py	/^message_queues = {}$/;"	v
+mimetypes	weixin.py	/^import mimetypes$/;"	i
+minidom	wechat_client.py	/^import xml.dom.minidom$/;"	i
+minidom	weixin.py	/^import xml.dom.minidom$/;"	i
+msg	agent.py	/^           msg = message_queues[socket].get_nowait()$/;"	v
+multiprocessing	2.py	/^import multiprocessing$/;"	i
+multiprocessing	myepoll.py	/^import multiprocessing$/;"	i
+multiprocessing	weixin.py	/^import multiprocessing$/;"	i
+notifyMode	weixin.py	/^    def notifyMode(self):$/;"	m	class:WebWeixin
+os	agent.py	/^import Queue,os$/;"	i
+os	wechat_client.py	/^import os $/;"	i
+os	weixin.py	/^import os$/;"	i
+p	epoll.py	/^	p = Pool(3)$/;"	v
+params	test.py	/^	params="xx"$/;"	v
+pdb	myepoll.py	/^import pdb $/;"	i
+platform	weixin.py	/^import platform$/;"	i
+pr	epoll.py	/^	pr = p.apply_async(process2, args=(recv, send))$/;"	v
+pr	myepoll.py	/^    pr = multiprocessing.Process(target=process2)$/;"	v
+process1	epoll.py	/^def process1(recv, send):$/;"	f
+process1	myepoll.py	/^def process1():$/;"	f
+process2	epoll.py	/^def process2(recv, send):$/;"	f
+process2	myepoll.py	/^def process2():$/;"	f
+pw	epoll.py	/^	pw = p.apply_async(process1, args=(recv, send))$/;"	v
+pw	myepoll.py	/^    pw = multiprocessing.Process(target=process1)$/;"	v
+q	2.py	/^q = multiprocessing.Queue()$/;"	v
+qrcode	common.py	/^import qrcode$/;"	i
+qrcode	wechat_client.py	/^import qrcode $/;"	i
+qrcode	weixin.py	/^import qrcode$/;"	i
+random	wechat_client.py	/^import random$/;"	i
+random	weixin.py	/^import random$/;"	i
+re	wechat_client.py	/^import re$/;"	i
+re	weixin.py	/^import re$/;"	i
+reader	2.py	/^reader = multiprocessing.Process(target=reader_proc)$/;"	v
+reader_proc	2.py	/^def reader_proc():$/;"	f
+recv	epoll.py	/^	recv = manager.Queue()$/;"	v
+recv	myepoll.py	/^    recv = multiprocessing.Queue()$/;"	v
+requests	weixin.py	/^import requests$/;"	i
+rt	test.py	/^	rt=Mypost(url, params)$/;"	v
+select	agent.py	/^import select$/;"	i
+select	epoll.py	/^import socket, select $/;"	i
+select	myepoll.py	/^import select, errno$/;"	i
+send	epoll.py	/^	send = manager.Queue()$/;"	v
+send	myepoll.py	/^    send = multiprocessing.Queue()$/;"	v
+sendEmotion	weixin.py	/^    def sendEmotion(self, name, file_name):$/;"	m	class:WebWeixin
+sendImg	weixin.py	/^    def sendImg(self, name, file_name):$/;"	m	class:WebWeixin
+sendMsg	wechat_client.py	/^	def sendMsg(self, name, word, isfile=False):$/;"	m	class:WebWeChat
+sendMsg	weixin.py	/^    def sendMsg(self, name, word, isfile=False):$/;"	m	class:WebWeixin
+sendMsgToAll	weixin.py	/^    def sendMsgToAll(self, word):$/;"	m	class:WebWeixin
+send_msg_flag	myepoll.py	/^    send_msg_flag = Value('i', -1)$/;"	v
+server_address	agent.py	/^server_address = ("", 8999)$/;"	v
+serversocket	agent.py	/^serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)$/;"	v
+sh_cmd	common.py	/^def sh_cmd(cmd):$/;"	f
+socket	agent.py	/^     socket = fd_to_socket[fd]$/;"	v
+socket	agent.py	/^import socket$/;"	i
+socket	epoll.py	/^import socket, select $/;"	i
+socket	myepoll.py	/^import socket$/;"	i
+start	wechat_client.py	/^	def start(self):$/;"	m	class:WebWeChat
+start	weixin.py	/^    def start(self):$/;"	m	class:WebWeixin
+synccheck	wechat_client.py	/^	def synccheck(self):$/;"	m	class:WebWeChat
+synccheck	weixin.py	/^    def synccheck(self):$/;"	m	class:WebWeixin
+sys	myepoll.py	/^import sys$/;"	i
+sys	wechat_client.py	/^import sys$/;"	i
+sys	weixin.py	/^import sys$/;"	i
+test	wechat_client.py	/^import test$/;"	i
+testsynccheck	wechat_client.py	/^	def testsynccheck(self):$/;"	m	class:WebWeChat
+testsynccheck	weixin.py	/^    def testsynccheck(self):$/;"	m	class:WebWeixin
+time	epoll.py	/^import time$/;"	i
+time	myepoll.py	/^import time$/;"	i
+time	wechat_client.py	/^import time$/;"	i
+time	weixin.py	/^import time$/;"	i
+timeout	agent.py	/^timeout = 10$/;"	v
+url	test.py	/^	url="xx"$/;"	v
+urllib	common.py	/^import urllib$/;"	i
+urllib	test.py	/^import urllib$/;"	i
+urllib	wechat_client.py	/^import urllib $/;"	i
+urllib	weixin.py	/^import urllib$/;"	i
+urllib2	common.py	/^import urllib2 $/;"	i
+urllib2	test.py	/^import urllib2$/;"	i
+urllib2	wechat_client.py	/^import urllib2 $/;"	i
+urllib2	weixin.py	/^import urllib2$/;"	i
+urlparse	weixin.py	/^from urlparse import urlparse$/;"	i
+waitForLogin	wechat_client.py	/^	def waitForLogin(self, tip=1):$/;"	m	class:WebWeChat
+waitForLogin	weixin.py	/^    def waitForLogin(self, tip=1):$/;"	m	class:WebWeixin
+webwx	weixin.py	/^    webwx = WebWeixin()$/;"	v
+webwxbatchgetcontact	weixin.py	/^    def webwxbatchgetcontact(self):$/;"	m	class:WebWeixin
+webwxgetcontact	weixin.py	/^    def webwxgetcontact(self):$/;"	m	class:WebWeixin
+webwxgetheadimg	weixin.py	/^    def webwxgetheadimg(self, id):$/;"	m	class:WebWeixin
+webwxgeticon	weixin.py	/^    def webwxgeticon(self, id):$/;"	m	class:WebWeixin
+webwxgetmsgimg	weixin.py	/^    def webwxgetmsgimg(self, msgid):$/;"	m	class:WebWeixin
+webwxgetvideo	weixin.py	/^    def webwxgetvideo(self, msgid):$/;"	m	class:WebWeixin
+webwxgetvoice	weixin.py	/^    def webwxgetvoice(self, msgid):$/;"	m	class:WebWeixin
+webwxinit	weixin.py	/^    def webwxinit(self):$/;"	m	class:WebWeixin
+webwxsendmsg	weixin.py	/^    def webwxsendmsg(self, word, to='filehelper'):$/;"	m	class:WebWeixin
+webwxsendmsgemotion	weixin.py	/^    def webwxsendmsgemotion(self, user_id, media_id):$/;"	m	class:WebWeixin
+webwxsendmsgimg	weixin.py	/^    def webwxsendmsgimg(self, user_id, media_id):$/;"	m	class:WebWeixin
+webwxstatusnotify	weixin.py	/^    def webwxstatusnotify(self):$/;"	m	class:WebWeixin
+webwxsync	weixin.py	/^    def webwxsync(self):$/;"	m	class:WebWeixin
+webwxuploadmedia	weixin.py	/^    def webwxuploadmedia(self, image_name):$/;"	m	class:WebWeixin
+wechatGetContact	wechat_client.py	/^	def wechatGetContact(self):$/;"	m	class:WebWeChat
+wechatGetGroupList	wechat_client.py	/^	def wechatGetGroupList(self):$/;"	m	class:WebWeChat
+wechatInit	wechat_client.py	/^	def wechatInit(self):$/;"	m	class:WebWeChat
+wechatStatusNotify	wechat_client.py	/^	def wechatStatusNotify(self):$/;"	m	class:WebWeChat
+wrapper	weixin.py	/^    def wrapper(*args):$/;"	f	function:catchKeyboardInterrupt
+write	weixin.py	/^    def write(self, s):$/;"	m	class:UnicodeStreamFilter
+writer	2.py	/^writer = multiprocessing.Process(target=writer_proc)$/;"	v
+writer_proc	2.py	/^def writer_proc():$/;"	f
+xiaoluo	agent.py	/^           xiaoluo = os.popen(msg).read()$/;"	v
+xml	wechat_client.py	/^import xml.dom.minidom$/;"	i
+xml	weixin.py	/^import xml.dom.minidom$/;"	i
