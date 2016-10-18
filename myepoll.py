@@ -2,6 +2,7 @@
 #encoding=utf-8
 
 import socket
+import thread
 import select, errno
 import sys
 from common import Log as Log
@@ -43,36 +44,33 @@ class Epoll(object):
         
         try:
             self.epoll_fd = select.epoll()
-            self.epoll_fd.register(self.listen_fd.fileno(), select.EPOLLIN)
+            self.epoll_fd.register(self.listen_fd.fileno(), select.EPOLLIN |select.EPOLLOUT)
         except select.error, msg:
             Log.error(msg)
             sys.exit(0)
 
     def Modify(self):
         while True:
+            lst = []
             if not send.empty():
                 msg = send.get().split(":")
-                print "whileName:", g_val.whiteName.keys()
                 if msg[0] in g_val.whiteName.keys():
-                    Log.info("send: %s" % msg[1])
-                    print "fileno_to_ip:", self.fileno_to_ip
                     for fileno, ipaddr in self.fileno_to_ip.items():
                         if ipaddr == g_val.whiteName[ msg[0] ]:
-                           Log.info("modify %d", fileno) 
-                           #self.epoll_fd.modify(fileno, select.EPOLLET | select.EPOLLOUT)
-                           self.send_msg[fileno] = msg[1]
+                           self.epoll_fd.modify(fileno, select.EPOLLIN | select.EPOLLOUT)
+                           lst.append(msg[1]) 
+                    if len(lst) > 0: 
+                        self.send_msg[fileno] = lst 
             else:
-                break
+                time.sleep(1) 
+        thread.exit_thread()
 
     def hanle_event(self):
         #datalist = {}
+       	thread.start_new_thread(Epoll.Modify, (self, )) 
         while True:
-            Log.debug("Modify start")
-            Epoll.Modify(self)	
-            Log.debug("Modify end")
             epoll_list = self.epoll_fd.poll()
             for fd, events in epoll_list:
-                Log.debug("list epoll ")
                 if fd == self.listen_fd.fileno():
                     conn, addr = self.listen_fd.accept()
                     Log.debug("accept connection from %s, %d, fd = %d" % (addr[0], addr[1], conn.fileno()))
@@ -85,7 +83,6 @@ class Epoll(object):
                     while True:
                         try:
                             data = self.fileno_to_connection[fd].recv(10)
-                            Log.debug("part of msg: %s" % data) 
                             if not data and not datas:
                                 self.epoll_fd.unregister(fd)
                                 self.fileno_to_connection[fd].close()
@@ -96,7 +93,7 @@ class Epoll(object):
                         except socket.error, msg:
                             if msg.errno == errno.EAGAIN:
                                 Log.debug("%s receive %s" % (fd, datas))
-                                self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
+                                #self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
                                 recv.put(datas)
                                 break
                             else:
@@ -111,13 +108,16 @@ class Epoll(object):
                     Log.debug("%s closed" % self.fileno_to_ip[fd])
                     break 
                 elif select.EPOLLOUT & events:
-                    Log.debug("out info %d" %fd)
+                    Log.debug("epoll out  %d" %fd)
                     if fd in self.send_msg.keys():
-                        Log.info("send msg , %s" % self.send_msg[fd])
-                        #self.fileno_to_connection[fd].send(self.send_msg[fd], len(self.send_msg[fd]))
-                        self.fileno_to_connection[fd].sendall(self.send_msg[fd])
+                        for msg in self.send_msg[fd]:
+                            Log.info("send msg:%s" % msg)
+                            #self.fileno_to_connection[fd].send(self.send_msg[fd], len(self.send_msg[fd]))
+                            self.fileno_to_connection[fd].sendall(msg)
                         del self.send_msg[fd]
                         Log.info("send msg ok")
+                    else:
+                        Log.info("send msg empty")
                     self.epoll_fd.modify(fd, select.EPOLLIN | select.EPOLLET)
                     break 
                 else:
@@ -146,11 +146,10 @@ def process1():
 def process2():
     now = time.time()
     while True:
-        Log.info("process2.....")
         if time.time() - now > 30:
             Log.info("process2  send 发送: TT" )
             now = time.time()
-            send.put("1:ceph -s")
+            send.put("1:ggg|ceph -s")
             while True:
                 if not recv.empty():
                     Log.info("recv收到 :%s" %recv.get())
