@@ -8,6 +8,7 @@ import qrcode
 from log import Log as Log
 import ConfigParser
 import weixin 
+from multiprocessing import Process,Queue,Pool, Manager, Value, Array
 import commands
 
 def sh_cmd(cmd):
@@ -17,17 +18,18 @@ def sh_cmd(cmd):
 	else:
 		return status, "process failed"
 
-
 class Global(object):
 	def __init__(self, configFile='./wechat.ini'):
 		self.configFile=configFile
-		self.whiteName={}
-		
+		self.autonotify = Value('i', 1)
+		self.updateconfig = Value('i', 0)
+		self.whiteName= {}
+    
 	def ParserArg(self):
 		cf = ConfigParser.ConfigParser()
 		cf.read(self.configFile)
-		self.member = cf.get("auto_reply", "member").split(";")	#list
-	
+		self.member = cf.get("auto_reply", "member").split(";") #list
+
 	def GetWhiteName(self):
 		cf = ConfigParser.ConfigParser()
 		cf.read(self.configFile)

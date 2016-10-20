@@ -12,6 +12,7 @@ import multiprocessing
 import time
 import Queue
 import common
+import wx
 
 class Epoll(object):
     def __init__(self):
@@ -49,8 +50,10 @@ class Epoll(object):
             Log.error(msg)
             sys.exit(0)
 
-    def Modify(self):
+    def Modify(self, send):
         while True:
+            if not wx.recv.empty():
+                Log.info("recv not emtpy")
             lst = []
             if not send.empty():
                 msg = send.get().split(":")
@@ -65,9 +68,9 @@ class Epoll(object):
                 time.sleep(1) 
         thread.exit_thread()
 
-    def hanle_event(self):
+    def hanle_event(self, send, recv):
         #datalist = {}
-       	thread.start_new_thread(Epoll.Modify, (self, )) 
+       	thread.start_new_thread(Epoll.Modify, (self, send)) 
         while True:
             epoll_list = self.epoll_fd.poll()
             for fd, events in epoll_list:
@@ -122,9 +125,9 @@ class Epoll(object):
                     break 
                 else:
                     break 
-def process1():
+def EpollServer(send, recv):
     ep = Epoll()
-    ep.hanle_event()
+    ep.hanle_event(send, recv)
 """
     now = time.time()
     while True:

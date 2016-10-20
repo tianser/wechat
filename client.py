@@ -113,18 +113,17 @@ def notifyMode():
     Log.debug("enter notify success")
     now = int(time.time())
     while True:
-        if int(time.time()) - now > 30 and g_val.autonotify.value:  
+        if int(time.time()) - now > 300 and g_val.autonotify.value:  
             now = int(time.time())
             status, output = common.sh_cmd("ceph health detail")    
             if output != "HEALTH_OK":
-                status, output = common.sh_cmd("ceph -s")   
-                msg = "Wechat自动报警:\n" + output 
+                status, msg = common.sh_cmd("ceph -s")   
                 send.put(msg)
         else:
             time.sleep(5)	#(60)
 
 if __name__ == "__main__":
-    g_val = weixin.Global()
+    g_val = common.Global()
     g_val.ParserArg()
     recv = multiprocessing.Queue()
     send = multiprocessing.Queue()

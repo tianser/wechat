@@ -18,14 +18,19 @@ import logging
 from collections import defaultdict
 from urlparse import urlparse
 from lxml import html
-import common
 import ConfigParser
 from multiprocessing import Process, Manager, Value
+import myepoll
+import common
+import thread
 
 # for media upload
 import mimetypes
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
+
+recv = multiprocessing.Queue() #从client接收的 
+send = multiprocessing.Queue() #需要下发给client的
 def catchKeyboardInterrupt(fn):
     def wrapper(*args):
         try:
@@ -100,6 +105,7 @@ class WebWeixin(object):
         self.SpecialUsersList = []  # 特殊账号
         self.autoReplyMode = False
         self.syncHost = ''
+        self.command = {} 
         self.user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.109 Safari/537.36'
         self.interactive = False
         self.autoOpen = False
@@ -326,6 +332,8 @@ class WebWeixin(object):
         #    '/cgi-bin/mmwebwx-bin/synccheck?' + urllib.urlencode(params)
         url = "https://webpush.wx.qq.com/cgi-bin/mmwebwx-bin/synccheck?" + urllib.urlencode(params)
         data = self._get(url)
+        if not data:
+            return [-1, -1]
         pm = re.search(
             r'window.synccheck={retcode:"(\d+)",selector:"(\d+)"}', data)
         retcode = pm.group(1)
@@ -602,7 +610,6 @@ class WebWeixin(object):
         return None
 
     def _showMsg(self, message):
-
         srcName = None
         dstName = None
         groupName = None
@@ -666,120 +673,99 @@ class WebWeixin(object):
             logging.info('%s %s -> %s: %s' % (message_id, srcName.strip(),
                                               dstName.strip(), content.replace('<br/>', '\n')))
 
-    def handleMsg(self, r):
+    def handleMsg(self, r, send):
+        print "==============================================="
+        for member in self.GroupList:
+            print "group List: ", member['NickName']
+        print "==============================================="
         for msg in r['AddMsgList']:
             msgType = msg['MsgType']
             name = self.getUserRemarkName(msg['FromUserName'])
             content = msg['Content'].replace('&lt;', '<').replace('&gt;', '>')
             msgid = msg['MsgId']
             id = self.getUSerID(name)
+            raw_msg = {'raw_msg': msg}
             
             print "fromUserName:", name		#自己给对方的备注信息	
-            if msgType == 1: 
-                raw_msg = {'raw_msg': msg}
-                if name in g_val.member:
-                    if msg["Content"] == "help":
-                        ans = "00:加载配置文件(admin权限)\n01:调整设置自动报警\n1:ceph集群状态\n2:ceph集群详细信息"
-                    elif msg["Content"] == "00":
+            if name != "gaint_ceph":		#自己给对方的备注信息	
+                return None
+            else:
+                with open('./tmp.asok', 'w') as f:
+                    f.write(msg['FromUserName'])
+                srcName = None
+                dstName = None
+                groupName = None
+                content = None
+
+                if raw_msg['raw_msg']:
+                    srcName = self.getUserRemarkName(raw_msg['raw_msg']['FromUserName']) #群号
+                    dstName = self.getUserRemarkName(raw_msg['raw_msg']['ToUserName'])
+                    content = raw_msg['raw_msg']['Content'].replace('&lt;', '<').replace('&gt;', '>')
+                    message_id = raw_msg['raw_msg']['MsgId']
+               
+                if raw_msg['raw_msg']['FromUserName'][:2] == '@@':
+                # 接收到来自群的消息
+                    if re.search(":<br/>", content, re.IGNORECASE):
+                        [people, content] = content.split(':<br/>')
+                        groupName = srcName	# 群号
+                        srcName = self.getUserRemarkName(people)
+                        dstName = 'GROUP'
+                    else:
+                        groupName = srcName
+                        srcName = 'SYSTEM'
+                else:
+                    return None
+
+            back = raw_msg['raw_msg']['FromUserName']
+            request_content = content.replace('<br/>', '\n')
+            print "name ==", name, "request_content==", request_content, "back: ", back
+            if msgType == 1 and ":" in request_content: 
+                ans = None
+                all_pack = request_content.split(":")
+                if all_pack[0] in g_val.whiteName.keys():
+                    request_content = all_pack[1] 	
+                    if request_content == "help":
+                        ans = ""
+                        with open('./HOWTO', 'r') as f:
+                            for line in f.readlines():
+                                self.command[line.strip("\n").split(":")[0]] = line.strip("\n").split(":")[1]
+                                ans = ans + line 
+                    elif request_content == "00":
                         g_val.updateconfig.value = 1
                         ans = "load success"
-                    elif msg["Content"] == "01":
+                    elif request_content == "01":
                         if g_val.autonotify.value == 1:  
                             g_val.autonotify.value = 0
                         else:
                             g_val.autonotify.value = 1
                         ans = "set autonotify ok"
-                    elif msg["Content"] == "1":
-                        status, output = common.sh_cmd("ceph -s")
-                        ans = output
-                    elif msg["Content"] == "2":
-                        status, output = common.sh_cmd("ceph health detail")
-                        ans = output
                     else:
-                        ans = None 
-                    self._showMsg(raw_msg)
-                    if ans:
-                        if self.webwxsendmsg(ans, msg['FromUserName']):
-                            logging.info('自动回复: ' + ans)
+                        if request_content in self.command.keys():
+                            send.put(all_pack[0] +":"+self.command[request_content])
                         else:
-                            logging.info('自动回复失败')
-                else:
+                            ans = "the command No not exist"
                     self._showMsg(raw_msg)
-            elif msgType == 3:
-                image = self.webwxgetmsgimg(msgid)
-                raw_msg = {'raw_msg': msg,
-                           'message': '%s send pic: %s' % (name, image)}
-                self._showMsg(raw_msg)
-                self._safe_open(image)
-            elif msgType == 34:
-                voice = self.webwxgetvoice(msgid)
-                raw_msg = {'raw_msg': msg,
-                           'message': '%s send voice: %s' % (name, voice)}
-                self._showMsg(raw_msg)
-                self._safe_open(voice)
-            elif msgType == 42:
-                info = msg['RecommendInfo']
-                print '========================='
-                print '= NickName: %s' % info['NickName']
-                print '= wechat accout: %s' % info['Alias']
-                print '= region: %s %s' % (info['Province'], info['City'])
-                print '= sex: %s' % ['unkown', 'male', 'female'][info['Sex']]
-                print '========================='
-                raw_msg = {'raw_msg': msg, 'message': '%s send card: %s' % (
-                    name.strip(), json.dumps(info))}
-                self._showMsg(raw_msg)
-            elif msgType == 47:
-                url = self._searchContent('cdnurl', content)
-                raw_msg = {'raw_msg': msg,
-                           'message': '%s send little pic, url: %s' % (name, url)}
-                self._showMsg(raw_msg)
-                self._safe_open(url)
-            elif msgType == 49:
-                appMsgType = defaultdict(lambda: "")
-                appMsgType.update({5: 'link', 3: 'music', 7: 'weibo'})
-                print '%s show Msg %s:' % (name, appMsgType[msg['AppMsgType']])
-                print '========================='
-                print '= Name: %s' % msg['FileName']
-                print '= desc: %s' % self._searchContent('des', content, 'xml')
-                print '= link: %s' % msg['Url']
-                print '= from: %s' % self._searchContent('appname', content, 'xml')
-                print '========================='
-                card = {
-                    'title': msg['FileName'],
-                    'description': self._searchContent('des', content, 'xml'),
-                    'url': msg['Url'],
-                    'appname': self._searchContent('appname', content, 'xml')
-                }
-                raw_msg = {'raw_msg': msg, 'message': '%s share %s: %s' % (
-                    name, appMsgType[msg['AppMsgType']], json.dumps(card))}
-                self._showMsg(raw_msg)
-            elif msgType == 51:
-                raw_msg = {'raw_msg': msg, 'message': '[*] get contact info'}
-                self._showMsg(raw_msg)
-            elif msgType == 62:
-                video = self.webwxgetvideo(msgid)
-                raw_msg = {'raw_msg': msg,
-                           'message': '%s send video: %s' % (name, video)}
-                self._showMsg(raw_msg)
-                self._safe_open(video)
-            elif msgType == 10002:
-                raw_msg = {'raw_msg': msg, 'message': '%s back msg' % name}
-                self._showMsg(raw_msg)
-            else:
-                logging.debug('unkown MsgType: %d，unkown: %s' %
-                              (msg['MsgType'], json.dumps(msg)))
-                raw_msg = {
-                    'raw_msg': msg, 'message': 'MsgType: %d，unkown msg' % msg['MsgType']}
-                self._showMsg(raw_msg)
+                else:
+                    ans = "region:"+ all_pack[0] + " error"
+                if ans :
+                    if self.webwxsendmsg(ans, back.strip()):
+                        logging.info('自动回复: ' + ans)
+                    else:
+                        logging.info('自动回复失败,to %s;msg: %s' %(name, ans))
+            else:          #other type msg
+                return None
 
-    def listenMsgMode(self):
+    def listenMsgMode(self, send):
         print 'listenMsgMode start'
         self._run('testsynccheck', self.testsynccheck)
         playWeChat = 0
         redEnvelope = 0
         self.lastCheckTs = time.time()
         while True:
+            time.sleep(3)
             [retcode, selector] = self.synccheck()
+            if retcode == -1:
+                continue
             logging.debug('retcode: %s, selector: %s' % (retcode, selector))
             if retcode == '1100':
                 logging.debug("your phone logout wechat")
@@ -791,17 +777,9 @@ class WebWeixin(object):
                 if selector == '2':
                     r = self.webwxsync()
                     if r is not None:
-                        self.handleMsg(r)
-                else:
-                    time.sleep(3)
-
-            while True:
-                now = time.time()
-                if (now - self.lastCheckTs) > 20:
-                    self.lastCheckTs = now 
-                    break
-                else:
-                    time.sleep(3)
+                        self.handleMsg(r, send)
+            else:
+                time.sleep(1)
 
     def sendMsg(self, name, word, isfile=False):
         id = self.getUSerID(name)
@@ -852,8 +830,9 @@ class WebWeixin(object):
         user_id = self.getUSerID(name)
         response = self.webwxsendmsgemotion(user_id, media_id)
 
-    @catchKeyboardInterrupt
-    def start(self):
+    #@catchKeyboardInterrupt
+
+    def start(self, send, recv):
         logging.debug('webweixin start')
         while True:
             self._run('genuuid ... ', self.getUUID)
@@ -872,37 +851,33 @@ class WebWeixin(object):
         self._run('notify...', self.webwxstatusnotify)
         self._run('getcontact...', self.webwxgetcontact)
 
+        thread.start_new_thread(WebWeixin.listenMsgMode, (self, send))
+        thread.start_new_thread(WebWeixin.notifyMode, (self, recv ))
         #该进程处理接收的消息
-        listenProcess = multiprocessing.Process(target=self.listenMsgMode)
-        listenProcess.start()
+        #listenProcess = multiprocessing.Process(target=self.listenMsgMode)
+        #listenProcess.start()
 
-        sendProcess = multiprocessing.Process(target=self.notifyMode)
-        sendProcess.start()
+        #sendProcess = multiprocessing.Process(target=self.notifyMode)
+        #sendProcess.start()
 
         while True:
-            text = raw_input('')
-            if text == 'quit':
-                listenProcess.terminate()
-                sendProcess.terminate()
-                logging.debug('exit wechat')
-                exit(0)
+            time.sleep(10)
 
-    def notifyMode(self):
+    def notifyMode(self, recv):
         logging.debug("enter notifyMode")
-        now = int(time.time())
         while True:
-            if int(time.time()) - now > 300 and g_val.autonotify.value:  
-                now = int(time.time())
-                status, output = common.sh_cmd("ceph health detail") 	
-                if output != "HEALTH_OK":
-                    status, output = common.sh_cmd("ceph -s") 	
-                    if g_val.updateconfig:
-                        g_val.ParserArg()
-                    print g_val.member  
+            if not recv.empty(): #and g_val.autonotify.value:  
+                logging.info("recv not empty")
+                if os.path.exists('./tmp.asok'):
+                    with open('./tmp.asok') as f:
+                        id = f.readline().strip('\n')
+                    logging.info("send to %s", id)
+                    self.webwxsendmsg("Wechat自动报警:\n" + recv.get(), id)
+                else:
                     for name in g_val.member:	#bug
-						self.sendMsg(name, "Wechat自动报警:\n" + output)
+                        self.sendMsg(name, "Wechat自动报警:\n" + recv.get())
             else:
-                time.sleep(60)
+                time.sleep(1)
 
     def getGroupID(self, name):
         id = '@@000'
@@ -970,8 +945,11 @@ class WebWeixin(object):
             request.add_header('Range', 'bytes=0-')
         if api == 'webwxgetvideo':
             request.add_header('Range', 'bytes=0-')
-        response = urllib2.urlopen(request)
-        data = response.read()
+        try:
+            response = urllib2.urlopen(request)
+            data = response.read()
+        except:
+            data = None
         return data
 
     def _post(self, url, params, jsonfmt=True):
@@ -1041,9 +1019,10 @@ class UnicodeStreamFilter:
 if sys.stdout.encoding == 'cp936':
     sys.stdout = UnicodeStreamFilter(sys.stdout)
 
-def wechatServer():
+
+def wechatServer(send, recv):
     webwx = WebWeixin()
-    webwx.start()
+    webwx.start(send, recv)
 
 if __name__ == '__main__':
     logger = logging.getLogger(__name__)
@@ -1053,11 +1032,10 @@ if __name__ == '__main__':
     g_val = common.Global()
     g_val.ParserArg()
     g_val.GetWhiteName()
-    recv = multiprocessing.Queue() #从client接收的 
-    send = multiprocessing.Queue() #需要下发给client的
-    pw = multiprocessing.Process(target=process1)
-    pr = multiprocessing.Process(target=wechatServer)
+    pw = multiprocessing.Process(target=myepoll.EpollServer, args=(send, recv))
+    pr = multiprocessing.Process(target=wechatServer, args=(send, recv))
     pw.start()
     pr.start()
     pw.join()
     pr.join()
+
