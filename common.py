@@ -18,10 +18,21 @@ def sh_cmd(cmd):
 	else:
 		return status, "process failed"
 
+class Agent(object):
+	def __init__(self, configFile='./agent.ini'):
+		self.ConfigFile = configFile 
+		self.NotifyFlag = Value('i', 1)
+		cf = ConfigParser.ConfigParser()
+		cf.read(self.ConfigFile)
+		self.myip = cf.get("agent", "myip")
+		self.myport = cf.get("agent", "myport")
+		self.server = cf.get("agent", "server")
+
 class Global(object):
 	def __init__(self, configFile='./wechat.ini'):
 		self.configFile=configFile
-		self.autonotify = Value('i', 1)
+		self.groupFlag = Value('i', 0)
+        self.groupId   = None 
 		self.updateconfig = Value('i', 0)
 		self.whiteName= {}
     
@@ -36,6 +47,7 @@ class Global(object):
 		self.regions = cf.get("client_region", "region").split(";")
 		for region in self.regions:
 			self.whiteName[region] = cf.get("client_region", region+"_ip")
+
 
 def _decode_list(data):
 	rt = []
