@@ -12,7 +12,6 @@ import multiprocessing
 import time
 import common
 import Queue
-import weixin
 
 class Epoll(object):
     def __init__(self):
@@ -31,13 +30,13 @@ class Epoll(object):
             sys.exit(0)
 
         try:
-            self.fd.bind(('127.0.0.1',9997))
+            self.fd.bind((g_val.myip, int(g_val.myport)))
         except socket.error, msg:
             Log.error("bind failed")
             sys.exit(0)
 
         try:
-            self.fd.connect(('192.168.39.172',9999))
+            self.fd.connect((g_val.server, 9999))
             self.fd.setblocking(0)
             self.fileno_to_connection[self.fd.fileno()] = self.fd
         except socket.error, msg:
@@ -79,7 +78,14 @@ class Epoll(object):
                             if msg.errno == errno.EAGAIN:
                                 Log.debug("%s receive %s" % (fd, datas)) #  ggg:ceph -s
                                 recv_msg = datas.split("|")
-                                status, output = common.sh_cmd(recv_msg[1])
+                                if recv_msg[1] == "Notify":
+                                    if g_val.NotifyFlag.value == 1:
+                                        g_val.NotifyFlag.value = 0
+                                    else:
+                                        g_val.NotifyFlag = 1
+                                    output = "set auto Notify success"
+                                else:
+                                    status, output = common.sh_cmd(recv_msg[1])
                                 send.put(recv_msg[0]+ "@" + output)
                                 self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
                                 break
@@ -105,15 +111,15 @@ class Epoll(object):
                     break 
                 else:
                     break 
-def process1():
+def EventHandle():
     ep = Epoll()
     ep.hanle_event()
 
-def notifyMode():
+def NotifyMode():
     Log.debug("enter notify success")
     now = int(time.time())
     while True:
-        if int(time.time()) - now > 300 and g_val.autonotify.value:  
+        if int(time.time()) - now > 300 and g_val.NotifyFlag.value:  
             now = int(time.time())
             status, output = common.sh_cmd("ceph health detail")    
             if output != "HEALTH_OK":
@@ -123,12 +129,11 @@ def notifyMode():
             time.sleep(5)	#(60)
 
 if __name__ == "__main__":
-    g_val = common.Global()
-    g_val.ParserArg()
+    g_val = common.Agent()
     recv = multiprocessing.Queue()
     send = multiprocessing.Queue()
-    pw = multiprocessing.Process(target=process1)
-    pr = multiprocessing.Process(target=notifyMode)
+    pw = multiprocessing.Process(target=EventHandle)
+    pr = multiprocessing.Process(target=NotifyMode)
     pw.start()
     pr.start()
     pw.join()
