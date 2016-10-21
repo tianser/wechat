@@ -1,155 +1,175 @@
-#!/usr/bin/python2.7 
-#encoding=utf-8 
+#!/usr/bin/python
+#encoding=utf-8
 
-import socket, select 
-from multiprocessing import Process,Queue,Pool, Manager
-#import Queue 
-from log import Log as Log
-#from multiprocessing import Queue, Manager, Process
+import socket
+import thread
+import select, errno
+import sys
+from common import Log as Log
+from multiprocessing import Process,Queue,Pool, Manager, Value, Array
+import pdb 
+import multiprocessing
 import time
+import Queue
 import common
-import errno
 
 class Epoll(object):
-	def __init__(self, port=9999):
-		self.address = ("0.0.0.0", port)
-		try:
-			self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		except socket.error as msg:
-			Log.error("socket error, %s", msg)
-			sys.exit(0)
+    def __init__(self):
+        self.fileno_to_connection = {}
+        self.fileno_to_ip = {}
+        self.send_msg = {}
+        try:
+            self.listen_fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+        except socket.error, msg:
+            Log.error("create socket failed")
+            sys.exit(0)
 
-		self.server_socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
-		self.timeout = 10
-		self.recv_message_queues = {}
-		self.send_message_queues = {}	#ip： msg
-	
-	def bind_and_listen(self):
-		try:
-			self.server_socket.bind(self.address)
-			self.server_socket.listen(10)
-			self.server_socket.setblocking(0)
-		except socket.error as msg:
-			self.server_socket.close()
-			self.server_socket = None
-			Log.error("bind or listen error, %s", msg)
-			sys.exit(0)
-	
-	def	epoll_init(self):
-		self.epoll = select.epoll()
-		self.epoll.register(self.server_socket.fileno(), select.EPOLLIN)
-		self.fd_to_socket = {self.server_socket.fileno():self.server_socket,}
-		self.fd_to_ip = {}
-	
-	def handle_event(self, recv, send): 
-		while True:
-			events = self.epoll.poll(self.timeout)
-			if not events:
-				continue
-			for fd, event in events:
-				socket = self.fd_to_socket[fd]
-				#EPOLLIN
-				if event & select.EPOLLIN:
-					if socket == self.server_socket:	#监听socket
-						connection, address = self.server_socket.accept()
-						connection.setblocking(0)
-						#注册新连接fd到待读事件集合
-						if address[0] not in g_val.WhiteName:	#不在白名单里面，T掉
-							self.epoll.register(connection.fileno, select.EPOLLHUP)
-						else:
-							print "whiteName find it"
-							self.epoll.register(connection.fileno(), select.EPOLLIN | select.EPOLLET)
-							self.recv_message_queues[connection] = Queue()
-						self.fd_to_socket[connection.fileno()] = connection 
-						self.fd_to_ip[connection.fileno()] = address[0]
-					else: 								#客户端发送数据的socket
-						print "read data"
-						all_data = ""
-						while True:
-							try:
-								data = socket.recv(1024)	#阻塞
-								all_data = all_data + data
-								if not data:
-									self.epoll.unregister(socket)
-									socket.close()
-									del fd_to_ip[fd]
-									del fd_to_socket[fd]
-									break
-							except socket.error, error:
-								if error.errno == errno.EAGAIN:
-									self.epoll.modify(fd, select.EPOLLOUT)	#修改文件描述符标记
-									break
-								else:
-									self.epoll.unregister(socket)
-									del fd_to_ip[fd]
-									del fd_to_socket[fd]
-									socket.close()
-						print "all_data: ", all_data	
-						if all_data:
-							Log.info("recv from: %s, msg: %s"%\
-									(all_data, socket.getpeername()) )
-							recv.put(all_data)		 #发给其他进程
-				elif event & select.EPOLLOUT:
-					while True:
-						if not send.empty():
-							send_msg = send.get(True)
-							info = send_msg.split(":")	
-							if info[0] in self.fd_to_ip.values():
-								for key, value in self.fd_to_ip.items():
-									if key==fd and value == info[0]:
-										Log.info("send msg:%s to %s " % (info[1], self.fd_to_socket[fd].getpeername()))
-										self.fd_to_socket[fd].send(info[1])	
-										break
-							else:
-								recv.put(("%s is lost"%info[0]))
-								break
-						else:
-							self.epoll.modify(fd, select.EPOLLIN)
-							break
-				elif event & select.EPOLLHUP:
-					self.epoll.unregister(fd)
-					fd_to_socket[fd].close()
-					del fd_to_ip[fd]
-					del fd_to_socket[fd]
+        try:
+            self.listen_fd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        except socket.error, msg:
+            Log.error("setsocketopt SO_REUSEADDR failed")
+            sys.exit(0)
 
-	def epoll_destroy(self):
-		self.epoll.unregister(self.server_socket.fileno())
-		self.epoll.close()
-		self.server_socket.close()
+        try:
+            self.listen_fd.bind(('0.0.0.0',9999))
+        except socket.error, msg:
+            Log.error("bind failed")
+            sys.exit(0)
 
-def process1(recv, send):
-	print "process1"
-	epoll = Epoll()
-	epoll.bind_and_listen()
-	epoll.epoll_init()
-	epoll.handle_event(recv, send)
-	print "process1---"
-	epoll.epoll_destroy()
+        try:
+            self.listen_fd.listen(10)
+        except socket.error, msg:
+            Log.error(msg)
+            sys.exit(0)
+        
+        try:
+            self.epoll_fd = select.epoll()
+            self.epoll_fd.register(self.listen_fd.fileno(), select.EPOLLIN |select.EPOLLOUT)
+        except select.error, msg:
+            Log.error(msg)
+            sys.exit(0)
 
-def process2(recv, send):
-	while True:
-		if not recv.empty():
-			msg = recv.get_nowait()
-			Log.info("........recv: %s" %msg)
-		else:
-			Log.info(" recv no")
-		send.put("127.0.0.1:xxxx")
-		time.sleep(3)
+    def Modify(self, send, g_val):
+        while True:
+            lst = []
+            if not send.empty():
+                msg = send.get().split(":")
+                if msg[0] in g_val.whiteName.keys():
+                    for fileno, ipaddr in self.fileno_to_ip.items():
+                        if ipaddr == g_val.whiteName[ msg[0] ]:
+                           self.epoll_fd.modify(fileno, select.EPOLLIN | select.EPOLLOUT)
+                           lst.append(msg[1]) 
+                    if len(lst) > 0: 
+                        self.send_msg[fileno] = lst 
+            else:
+                time.sleep(1) 
+        thread.exit_thread()
 
+    def hanle_event(self, send, recv, g_val):
+        #datalist = {}
+       	thread.start_new_thread(Epoll.Modify, (self, send, g_val)) 
+        while True:
+            epoll_list = self.epoll_fd.poll()
+            for fd, events in epoll_list:
+                if fd == self.listen_fd.fileno():
+                    conn, addr = self.listen_fd.accept()
+                    Log.debug("accept connection from %s, %d, fd = %d" % (addr[0], addr[1], conn.fileno()))
+                    conn.setblocking(0)
+                    self.epoll_fd.register(conn.fileno(), select.EPOLLIN | select.EPOLLET)
+                    self.fileno_to_connection[conn.fileno()] = conn
+                    self.fileno_to_ip[conn.fileno()] = addr[0]
+                elif select.EPOLLIN & events:
+                    datas = ''
+                    while True:
+                        try:
+                            data = self.fileno_to_connection[fd].recv(10)
+                            if not data and not datas:
+                                self.epoll_fd.unregister(fd)
+                                self.fileno_to_connection[fd].close()
+                                Log.debug("%s closed" % self.fileno_to_ip[fd])
+                                break
+                            else:
+                                datas += data
+                        except socket.error, msg:
+                            if msg.errno == errno.EAGAIN:
+                                Log.debug("%s receive %s" % (fd, datas))
+                                #self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
+                                for region, ipaddr  in g_val.whiteName.items():
+                                    if ipaddr == self.fileno_to_ip[fd]:
+                                        recv.put("[ " + region+ "]:#"+datas)
+                                        break
+                                break
+                            else:
+                                self.epoll_fd.unregister(fd)
+                                self.fileno_to_connection[fd].close()
+                                Log.error(msg)
+                                break
+                    break 
+                elif select.EPOLLHUP & events:
+                    self.epoll_fd.unregister(fd)
+                    self.fileno_to_connection[fd].close()
+                    Log.debug("%s closed" % self.fileno_to_ip[fd])
+                    break 
+                elif select.EPOLLOUT & events:
+                    Log.debug("epoll out  %d" %fd)
+                    if fd in self.send_msg.keys():
+                        for msg in self.send_msg[fd]:
+                            Log.info("send msg:%s" % msg)
+                            #self.fileno_to_connection[fd].send(self.send_msg[fd], len(self.send_msg[fd]))
+                            self.fileno_to_connection[fd].sendall(msg)
+                        del self.send_msg[fd]
+                        Log.info("send msg ok")
+                    else:
+                        Log.info("send msg empty")
+                    self.epoll_fd.modify(fd, select.EPOLLIN | select.EPOLLET)
+                    break 
+                else:
+                    break 
+def EpollServer(send, recv, g_val):
+    ep = Epoll()
+    ep.hanle_event(send, recv, g_val)
+"""
+    now = time.time()
+    while True:
+        Log.info("process1.....")
+        if time.time() - now >2:
+            now = time.time()
+            Log.info("process1 recv 发送 : 上海 " )
+            recv.put("上海:shanghai")
+            while True:
+                if not send.empty():
+                    Log.info("send 收到: %s" % send.get())
+                else:
+                    Log.info("send empty")
+                    break
+        else:
+            time.sleep(1)
+"""
 
-if __name__ == "__main__":	
-	manager = Manager()
-	recv = manager.Queue()
-	send = manager.Queue()
-	g_val = common.Global()
-	g_val.GetWhiteName()
-	p = Pool(3)
-	#p = Process(target=process1, args=(recv, send,))
-	#p.start()
-	#p2 = Process(target=process2, args=(recv, send,))
-	#p2.start()
+def process2():
+    now = time.time()
+    while True:
+        if time.time() - now > 30:
+            Log.info("process2  send 发送: TT" )
+            now = time.time()
+            send.put("1:ggg|ceph -s")
+            while True:
+                if not recv.empty():
+                    Log.info("recv收到 :%s" %recv.get())
+                else:
+                    Log.info("recv empty")
+                    break
+        else :
+            time.sleep(3)
 
-	pw = p.apply_async(process1, args=(recv, send))
-	pr = p.apply_async(process2, args=(recv, send))
-	p.close()
-	p.join()
+if __name__ == "__main__":
+    g_val = common.Global()
+    g_val.GetWhiteName()
+    recv = multiprocessing.Queue()
+    send = multiprocessing.Queue()
+    pw = multiprocessing.Process(target=process1)
+    pr = multiprocessing.Process(target=process2)
+    pw.start()
+    pr.start()
+    pw.join()
+    pr.join()
