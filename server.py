@@ -791,11 +791,11 @@ class WebWeixin(object):
                         time.sleep(1)
             else:
                 if self.webwxsendmsg(word, id):
-                    logging.debug('[*] 消息发送成功')
+                    logging.debug('msg send success')
                 else:
-                    logging.debug('[*] 消息发送失败')
+                    logging.debug('msg send failed')
         else:
-            logging.debug('[*] 此用户不存在')
+            logging.debug('the id not exists')
 
     def sendMsgToAll(self, word):
         for contact in self.ContactList:
