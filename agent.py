@@ -12,6 +12,7 @@ import multiprocessing
 import time
 import common
 import Queue
+import signal
 
 class Epoll(object):
     def __init__(self):
@@ -30,9 +31,9 @@ class Epoll(object):
             sys.exit(0)
 
         try:
-            self.fd.bind((g_val.MyIp, int(g_val.MyPort)))
+            self.fd.bind((g_val.Ip, int(g_val.MyPort)))
         except socket.error, msg:
-			Log.error("bind:%s failed" % g_val.MyPort)
+            Log.error("bind:%s failed" % g_val.MyPort)
             sys.exit(0)
 
         try:
@@ -40,7 +41,7 @@ class Epoll(object):
             self.fd.setblocking(0)
             self.fileno_to_connection[self.fd.fileno()] = self.fd
         except socket.error, msg:
-			Log.error("connect %s:9999 failed" % g_val.ServerIp)
+            Log.error("connect %s:9999 failed" % g_val.ServerIp)
             sys.exit(0)
         
         try:
@@ -60,7 +61,7 @@ class Epoll(object):
     def hanle_event(self):
         thread.start_new_thread(Epoll.Modify, (self, ))
         while True:
-            if g_val.ExitFlag == 1:
+            if g_val.ExitFlag.value == 1:
                 Log.info("HandleMsg exit") 
                 sys.exit(0)
             epoll_list = self.epoll_fd.poll()
@@ -126,7 +127,7 @@ def NotifyMode():
     signal.signal(signal.SIGALRM, handle)
     signal.alarm(300)
     while True:
-        if g_val.ExitFlag == 1:
+        if g_val.ExitFlag.value == 1:
             Log.info("NotifyMode exit")
             sys.exit(0)
         time.sleep(3) #(60)

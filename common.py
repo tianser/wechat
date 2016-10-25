@@ -27,16 +27,16 @@ def sh_cmd(cmd):
 	else:
 		return status, "process failed"
 
-def Agent(object):
+class Agent(object):
 	def __init__(self, ConfigFile='./agent.ini'):
 		self.ConfigFile = ConfigFile 
 		self.NotifyFlag = Value('i', 1)
-        self.ExitFlag   = Value('i', 0)
+		self.ExitFlag   = Value('i', 0)
 		cf = ConfigParser.ConfigParser()
 		cf.read(self.ConfigFile)
 		self.ServerIp   = cf.get("server", "ip")
-		self.MyIp 		= cf.get("agent", "myip")
-		self.Myport     = cf.get("agent", "myport")
+		self.Ip 		= cf.get("agent", "myip")
+		self.MyPort     = cf.get("agent", "myport")
 
 class Global(object):
 	def __init__(self, configFile='./wechat.ini'):

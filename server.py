@@ -765,16 +765,10 @@ class WebWeixin(object):
                     r = self.webwxsync()
                     if r is not None:
                         self.handleMsg(r, send)
-                elif selector == '6':
-                    r = self.webwxsync()
-                    Log.debug("selector == 6")
-                elif selector == '4':
-                    r = self.webwxsync()
-                    Log.debug("selector == 6")
-                elif selector == '7':
                     Log.debug("selector == 7")
                     r = self.webwxsync()
-                elif selector == '0':
+                else:
+                    r = self.webwxsync()
                     time.sleep(1)
             else:
                 time.sleep(1)
