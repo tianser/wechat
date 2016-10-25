@@ -59,6 +59,7 @@ class Epoll(object):
                 time.sleep(1) 
 
     def hanle_event(self):
+        Log.info("wait msg")
         thread.start_new_thread(Epoll.Modify, (self, ))
         while True:
             if g_val.ExitFlag.value == 1:
@@ -147,9 +148,9 @@ if __name__ == "__main__":
     pr = multiprocessing.Process(target=NotifyMode)
     pw.start()
     pr.start()
-    signal.signal(signal.SIGINT, SigHandler)
-    if not pw.is_alive() and not pr.is_alive():
-        Log.info("main process exit")
-        sys.exit(0)
-    #pw.join()
-    #pr.join()
+    #signal.signal(signal.SIGINT, SigHandler)
+    #if not pw.is_alive() and not pr.is_alive():
+    #    Log.info("main process exit")
+    #    sys.exit(0)
+    pw.join()
+    pr.join()
