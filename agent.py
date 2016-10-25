@@ -12,7 +12,6 @@ import multiprocessing
 import time
 import common
 import Queue
-import weixin
 
 class Epoll(object):
     def __init__(self):
@@ -31,17 +30,17 @@ class Epoll(object):
             sys.exit(0)
 
         try:
-            self.fd.bind(('127.0.0.1',9997))
+            self.fd.bind((g_val.MyIp, int(g_val.MyPort)))
         except socket.error, msg:
-            Log.error("bind failed")
+			Log.error("bind:%s failed" % g_val.MyPort)
             sys.exit(0)
 
         try:
-            self.fd.connect(('192.168.39.172',9999))
+            self.fd.connect((g_val.ServerIp,9999))
             self.fd.setblocking(0)
             self.fileno_to_connection[self.fd.fileno()] = self.fd
         except socket.error, msg:
-            Log.error("connect failed")
+			Log.error("connect %s:9999 failed" % g_val.ServerIp)
             sys.exit(0)
         
         try:
@@ -61,6 +60,9 @@ class Epoll(object):
     def hanle_event(self):
         thread.start_new_thread(Epoll.Modify, (self, ))
         while True:
+            if g_val.ExitFlag == 1:
+                Log.info("HandleMsg exit") 
+                sys.exit(0)
             epoll_list = self.epoll_fd.poll()
             for fd, events in epoll_list:
                 if select.EPOLLIN & events:
@@ -71,7 +73,6 @@ class Epoll(object):
                             if not data and not datas:
                                 self.epoll_fd.unregister(fd)
                                 self.fileno_to_connection[fd].close()
-                                Log.debug("%s closed" % self.fileno_to_ip[fd])
                                 break
                             else:
                                 datas += data
@@ -79,7 +80,14 @@ class Epoll(object):
                             if msg.errno == errno.EAGAIN:
                                 Log.debug("%s receive %s" % (fd, datas)) #  ggg:ceph -s
                                 recv_msg = datas.split("|")
-                                status, output = common.sh_cmd(recv_msg[1])
+                                if recv_msg[1] == "Notify":
+                                    if g_val.NotifyFlag.value == 0:
+                                        g_val.NotifyFlag.value = 1 
+                                    else:
+                                        g_val.NotifyFlag.value = 0
+                                    output = "Nofify Mode set success"
+                                else:
+                                    status, output = common.sh_cmd(recv_msg[1])
                                 send.put(recv_msg[0]+ "@" + output)
                                 self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
                                 break
@@ -92,7 +100,6 @@ class Epoll(object):
                 elif select.EPOLLHUP & events:
                     self.epoll_fd.unregister(fd)
                     self.fileno_to_connection[fd].close()
-                    Log.debug("%s closed" % self.fileno_to_ip[fd])
                     break 
                 elif select.EPOLLOUT & events:
                     while True:
@@ -100,36 +107,48 @@ class Epoll(object):
                             self.fileno_to_connection[fd].sendall(send.get())
                         else:
                             break 
-							
+
                     self.epoll_fd.modify(fd, select.EPOLLIN | select.EPOLLET)
                     break 
                 else:
-                    break 
-def process1():
+                    time.sleep(1)
+                    break
+def handle():
+    if g_val.NotifyFlay.value:
+        status, output = common.sh_cmd("ceph health detail")
+        if output != "HEALTH_OK":
+            status, msg = common.sh_cmd("ceph -s")
+            send.put(msg)
+    signal.alarm(300)
+
+def NotifyMode():
+    Log.debug("enter notify success")
+    signal.signal(signal.SIGALRM, handle)
+    signal.alarm(300)
+    while True:
+        if g_val.ExitFlag == 1:
+            Log.info("NotifyMode exit")
+            sys.exit(0)
+        time.sleep(3) #(60)
+
+def HandleMsg():
     ep = Epoll()
     ep.hanle_event()
 
-def notifyMode():
-    Log.debug("enter notify success")
-    now = int(time.time())
-    while True:
-        if int(time.time()) - now > 300 and g_val.autonotify.value:  
-            now = int(time.time())
-            status, output = common.sh_cmd("ceph health detail")    
-            if output != "HEALTH_OK":
-                status, msg = common.sh_cmd("ceph -s")   
-                send.put(msg)
-        else:
-            time.sleep(5)	#(60)
+def SigHandler(signum, stack_frame):
+    g_val.ExitFlag.value = 1
 
 if __name__ == "__main__":
-    g_val = common.Global()
-    g_val.ParserArg()
+    g_val = common.Agent()
     recv = multiprocessing.Queue()
     send = multiprocessing.Queue()
-    pw = multiprocessing.Process(target=process1)
-    pr = multiprocessing.Process(target=notifyMode)
+    pw = multiprocessing.Process(target=HandleMsg)
+    pr = multiprocessing.Process(target=NotifyMode)
     pw.start()
     pr.start()
-    pw.join()
-    pr.join()
+    signal.signal(signal.SIGINT, SigHandler)
+    if not pw.is_alive() and not pr.is_alive():
+        Log.info("main process exit")
+        sys.exit(0)
+    #pw.join()
+    #pr.join()

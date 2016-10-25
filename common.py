@@ -5,11 +5,20 @@ import urllib
 import urllib2 
 import json
 import qrcode
-from log import Log as Log
 import ConfigParser
-import weixin 
 from multiprocessing import Process,Queue,Pool, Manager, Value, Array
 import commands
+
+import logging
+import coloredlogs
+import logging.config 
+
+logging.config.fileConfig('./log.conf')
+Log = logging.getLogger('wechat')
+cf = ConfigParser.ConfigParser()
+cf.read('./wechat.ini')
+log_level = cf.get("debug", "level")
+coloredlogs.install(level=log_level)
 
 def sh_cmd(cmd):
 	(status, output) = commands.getstatusoutput(cmd)
@@ -18,10 +27,21 @@ def sh_cmd(cmd):
 	else:
 		return status, "process failed"
 
+def Agent(object):
+	def __init__(self, ConfigFile='./agent.ini'):
+		self.ConfigFile = ConfigFile 
+		self.NotifyFlag = Value('i', 1)
+        self.ExitFlag   = Value('i', 0)
+		cf = ConfigParser.ConfigParser()
+		cf.read(self.ConfigFile)
+		self.ServerIp   = cf.get("server", "ip")
+		self.MyIp 		= cf.get("agent", "myip")
+		self.Myport     = cf.get("agent", "myport")
+
 class Global(object):
 	def __init__(self, configFile='./wechat.ini'):
 		self.configFile=configFile
-		self.autonotify = Value('i', 1)
+		self.IdFlag = Value('i', 0)
 		self.updateconfig = Value('i', 0)
 		self.whiteName= {}
     
