@@ -43,6 +43,7 @@ class Global(object):
 		self.configFile=configFile
 		self.IdFlag = Value('i', 0)
 		self.updateconfig = Value('i', 0)
+		self.ExitFlag   = Value('i', 0)
 		self.whiteName= {}
     
 	def ParserArg(self):

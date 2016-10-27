@@ -14,10 +14,30 @@ import common
 import Queue
 import signal
 
+class Heart(object):
+    def __init__(self):
+        self.start = int(time.time())
+        self.count = 0
+
+    def reset(self):
+        self.count = 0
+
+    def HeartHandle(self):
+        while True:
+            now = int(time.time())
+            if now - self.start > 10:
+                self.start = now
+                self.count = self.count + 1
+            else:
+				time.sleep(3)
+
 class Epoll(object):
     def __init__(self):
         self.fileno_to_connection = {}
+        self.heart = {}
         self.send_msg = {}
+
+    def bind_and_connect(self):
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -40,6 +60,7 @@ class Epoll(object):
             self.fd.connect((g_val.ServerIp,9999))
             self.fd.setblocking(0)
             self.fileno_to_connection[self.fd.fileno()] = self.fd
+            self.heart[self.fd.fileno()] = Heart()
         except socket.error, msg:
             Log.error("connect %s:9999 failed" % g_val.ServerIp)
             sys.exit(0)
@@ -53,14 +74,30 @@ class Epoll(object):
 
     def Modify(self):
         while True:
+            for key, value in self.heart.items():
+                if value.count > 5:
+                    self.epoll_fd.modify(key, select.EPOLLET | select.EPOLLHUP)
             if not send.empty():
                 self.epoll_fd.modify(self.fd.fileno(), select.EPOLLET | select.EPOLLOUT)
             else:
                 time.sleep(1) 
 
+    def HeartBeat(self):
+       run_list = []
+       while True:
+           for id in run_list:
+              if id not in self.heart.key():
+                  run_list.remove(id)
+           for key, value in self.heart.items():
+               if key not in run_list:
+                   run_list.append(key)
+                   value.HeartHandle()
+           time.sleep(1)
+
     def hanle_event(self):
         Log.info("wait msg")
         thread.start_new_thread(Epoll.Modify, (self, ))
+        thread.start_new_thread(Epoll.HeartBeat, (self, ))
         while True:
             if g_val.ExitFlag.value == 1:
                 Log.info("HandleMsg exit") 
@@ -80,7 +117,8 @@ class Epoll(object):
                                 datas += data
                         except socket.error, msg:
                             if msg.errno == errno.EAGAIN:
-                                Log.debug("%s receive %s" % (fd, datas)) #  ggg:ceph -s
+                                Log.debug("fd:%s receive %s" % (fd, datas)) #  ggg:ceph -s
+                                self.heart[fd].reset()
                                 recv_msg = datas.split("|")
                                 if recv_msg[1] == "Notify":
                                     if g_val.NotifyFlag.value == 0:
@@ -88,10 +126,14 @@ class Epoll(object):
                                     else:
                                         g_val.NotifyFlag.value = 0
                                     output = "Nofify Mode set success"
+                                elif recv_msg[1] == "heart echo":
+                                    Log.info("recv heart echo from server")
+                                    break
                                 else:
                                     status, output = common.sh_cmd(recv_msg[1])
-                                send.put(recv_msg[0]+ "@" + output)
-                                self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
+                                if output != "":
+                                    send.put(recv_msg[0]+ "@" + output)
+                                    self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
                                 break
                             else:
                                 self.epoll_fd.unregister(fd)
@@ -102,7 +144,7 @@ class Epoll(object):
                 elif select.EPOLLHUP & events:
                     self.epoll_fd.unregister(fd)
                     self.fileno_to_connection[fd].close()
-                    break 
+                    Epoll.bind_and_connect()
                 elif select.EPOLLOUT & events:
                     while True:
                         if not send.empty():
@@ -115,8 +157,9 @@ class Epoll(object):
                 else:
                     time.sleep(1)
                     break
-def handle():
-    if g_val.NotifyFlay.value:
+
+def handle(signum, stack_frame):
+    if g_val.NotifyFlag.value:
         status, output = common.sh_cmd("ceph health detail")
         if output != "HEALTH_OK":
             status, msg = common.sh_cmd("ceph -s")
@@ -131,10 +174,12 @@ def NotifyMode():
         if g_val.ExitFlag.value == 1:
             Log.info("NotifyMode exit")
             sys.exit(0)
-        time.sleep(3) #(60)
+        time.sleep(30) #(60)
+        send.put("heart beat")
 
 def HandleMsg():
     ep = Epoll()
+    ep.bind_and_connect()
     ep.hanle_event()
 
 def SigHandler(signum, stack_frame):
@@ -148,9 +193,9 @@ if __name__ == "__main__":
     pr = multiprocessing.Process(target=NotifyMode)
     pw.start()
     pr.start()
-    #signal.signal(signal.SIGINT, SigHandler)
-    #if not pw.is_alive() and not pr.is_alive():
-    #    Log.info("main process exit")
-    #    sys.exit(0)
-    pw.join()
-    pr.join()
+    signal.signal(signal.SIGINT, SigHandler)
+    if not pw.is_alive() and not pr.is_alive():
+        Log.info("main process exit")
+        sys.exit(0)
+    #pw.join()
+    #pr.join()

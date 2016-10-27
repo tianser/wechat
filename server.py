@@ -23,6 +23,7 @@ import epoll
 from common import Log as Log
 import common
 import thread
+import signal
 
 # for media upload
 import mimetypes
@@ -132,10 +133,10 @@ class WebWeixin(object):
         return False
 
     def genQRCode(self):
-        if sys.platform.startswith('win'):
-            self._showQRCodeImg()
-        else:
-            self._str2qr('https://login.weixin.qq.com/l/' + self.uuid)
+        #if sys.platform.startswith('win'):
+        self._showQRCodeImg()
+        #else:
+        self._str2qr('https://login.weixin.qq.com/l/' + self.uuid)
 
     def _showQRCodeImg(self):
         url = 'https://login.weixin.qq.com/qrcode/' + self.uuid
@@ -146,7 +147,7 @@ class WebWeixin(object):
 
         data = self._post(url, params, False)
         QRCODE_PATH = self._saveFile('qrcode.jpg', data, '_showQRCodeImg')
-        os.startfile(QRCODE_PATH)
+        #os.startfile(QRCODE_PATH)
 
     def waitForLogin(self, tip=1):
         time.sleep(tip)
@@ -327,7 +328,7 @@ class WebWeixin(object):
         retcode = pm.group(1)
         selector = pm.group(2)
         if selector != "2":
-            Log.info("url: \n %s return \n: %s" % (url, data))
+            Log.info("url:%s \n return : %s" % (url, data))
         return [retcode, selector]
 
     def webwxsync(self):
@@ -722,7 +723,7 @@ class WebWeixin(object):
                                 #更新command
                                 if line2 != "":
                                     self.command[line1.split(":")[0]] = line2
-                                ans = ans + line1 
+                                ans = ans + line1 + "\n"
                     elif request_content == "00":
                         g_val.updateconfig.value = 1
                         ans = "load success"
@@ -742,14 +743,17 @@ class WebWeixin(object):
             else:          #other type msg
                 return None
 
-    def listenMsgMode(self, send):
+    def listenMsgMode(self, send, g_val):
         Log.info('listenMsgMode start')
         self._run('testsynccheck', self.testsynccheck)
         playWeChat = 0
         redEnvelope = 0
         self.lastCheckTs = time.time()
         while True:
-            time.sleep(3)
+            if g_val.ExitFlag.value == 1:
+                Log.info("Wechat_Server exit listenMsgMode")
+                thread.exit_thread()  
+            time.sleep(2)
             [retcode, selector] = self.synccheck()
             if retcode == -1:
                 continue
@@ -765,8 +769,6 @@ class WebWeixin(object):
                     r = self.webwxsync()
                     if r is not None:
                         self.handleMsg(r, send)
-                    Log.debug("selector == 7")
-                    r = self.webwxsync()
                 else:
                     r = self.webwxsync()
                     time.sleep(1)
@@ -823,7 +825,7 @@ class WebWeixin(object):
         response = self.webwxsendmsgemotion(user_id, media_id)
 
     #@catchKeyboardInterrupt
-    def start(self, send, recv):
+    def start(self, send, recv, g_val):
         Log.debug('webweixin start')
         while True:
             self._run('genuuid ...', self.getUUID)
@@ -842,22 +844,28 @@ class WebWeixin(object):
         self._run('notify...', self.webwxstatusnotify)
         self._run('getcontact...', self.webwxgetcontact)
 
-        thread.start_new_thread(WebWeixin.listenMsgMode, (self, send))
-        thread.start_new_thread(WebWeixin.notifyMode, (self, recv ))
+        Listen = thread.start_new_thread(WebWeixin.listenMsgMode, (self, send, g_val))
+        Notify = thread.start_new_thread(WebWeixin.notifyMode, (self, recv, g_val))
         #该进程处理接收的消息
         #listenProcess = multiprocessing.Process(target=self.listenMsgMode)
         #listenProcess.start()
 
         #sendProcess = multiprocessing.Process(target=self.notifyMode)
         #sendProcess.start()
-
         while True:
-            time.sleep(10)
+            if g_val.ExitFlag.value == 1:
+                sys.exit(0)
+                Log.info("WeChat_main_Server exit")
+            else:
+                time.sleep(2)
 
-    def notifyMode(self, recv):
+    def notifyMode(self, recv, g_val):
         Log.debug("enter notifyMode")
         id = None
         while True:
+            if g_val.ExitFlag.value == 1:
+                Log.info("WeChat_Server exit notifyMode")
+                thread.exit_thread()  
             if not recv.empty():  
                 if not id and g_val.IdFlag.value == 1 and os.path.exists('./tmp.asok'):
                     with open('./tmp.asok') as f:
@@ -1018,9 +1026,12 @@ if sys.stdout.encoding == 'cp936':
     sys.stdout = UnicodeStreamFilter(sys.stdout)
 
 
-def wechatServer(send, recv):
+def wechatServer(send, recv, g_val):
     webwx = WebWeixin()
-    webwx.start(send, recv)
+    webwx.start(send, recv, g_val)
+
+def SigHandler(signum, stack_frame):
+    g_val.ExitFlag.value = 0 
 
 if __name__ == '__main__':
     g_val = common.Global()
@@ -1029,9 +1040,13 @@ if __name__ == '__main__':
     recv = multiprocessing.Queue() #从client接收的 
     send = multiprocessing.Queue() #需要下发给client的
     pw = multiprocessing.Process(target=epoll.EpollServer, args=(send, recv, g_val))
-    pr = multiprocessing.Process(target=wechatServer, args=(send, recv))
+    pr = multiprocessing.Process(target=wechatServer, args=(send, recv, g_val))
     pw.start()
     pr.start()
-    pw.join()
-    pr.join()
+    signal.signal(signal.SIGINT, SigHandler)
+    if not pw.is_alive() and not pr.is_alive():
+        Log.info("main process exit")
+        sys.exit(0)
+    #pw.join()
+    #pr.join()
 

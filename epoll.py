@@ -12,12 +12,31 @@ import multiprocessing
 import time
 import Queue
 import common
+import signal
+
+class Heart(object):
+    def __init__(self):
+        self.start = int(time.time())
+        self.count = 0
+   
+    def reset(self):
+        self.count = 0
+
+    def HeartHandle(self):
+        while True: 
+            now = int(time.time())
+            if now - self.start > 10:
+                self.start = now 
+                self.count = self.count + 1
+            else:
+                time.sleep(3)
 
 class Epoll(object):
     def __init__(self):
         self.fileno_to_connection = {}
         self.fileno_to_ip = {}
         self.send_msg = {}
+        self.heart    = {}
         try:
             self.listen_fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -51,6 +70,11 @@ class Epoll(object):
 
     def Modify(self, send, g_val):
         while True:
+            if g_val.ExitFlag.value == 1:
+                thread.exit_thread()
+            for key, value in self.heart.items():
+                if value.count > 5:
+                    self.epoll_fd.modify(key, select.EPOLLHUP)
             lst = []
             if not send.empty():
                 msg = send.get().split(":")
@@ -63,12 +87,28 @@ class Epoll(object):
                         self.send_msg[fileno] = lst 
             else:
                 time.sleep(1) 
-        thread.exit_thread()
+    
+    def HeartBeat(self, g_val):
+       run_list = []
+       while True:
+           if g_val.ExitFlag.value == 1:
+               thread.exit_thread()
+           for id in run_list:
+              if id not in self.heart.key():
+                  run_list.remove(id)
+           for key, value in self.heart.items():
+               if key not in run_list:
+                   run_list.append(key)
+                   value.HeartHandle()
+           time.sleep(1) 
 
     def hanle_event(self, send, recv, g_val):
         #datalist = {}
-       	thread.start_new_thread(Epoll.Modify, (self, send, g_val)) 
+        HB = thread.start_new_thread(Epoll.HeartBeat, (self, g_val )) 
+        Modify = thread.start_new_thread(Epoll.Modify, (self, send, g_val)) 
         while True:
+            if g_val.ExitFlag.value == 1:
+                break
             epoll_list = self.epoll_fd.poll()
             for fd, events in epoll_list:
                 if fd == self.listen_fd.fileno():
@@ -77,6 +117,7 @@ class Epoll(object):
                     conn.setblocking(0)
                     self.epoll_fd.register(conn.fileno(), select.EPOLLIN | select.EPOLLET)
                     self.fileno_to_connection[conn.fileno()] = conn
+                    self.heart[conn.fileno()] = Heart() 
                     self.fileno_to_ip[conn.fileno()] = addr[0]
                 elif select.EPOLLIN & events:
                     datas = ''
@@ -94,10 +135,16 @@ class Epoll(object):
                             if msg.errno == errno.EAGAIN:
                                 Log.debug("%s receive %s" % (fd, datas))
                                 #self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
-                                for region, ipaddr  in g_val.whiteName.items():
-                                    if ipaddr == self.fileno_to_ip[fd]:
-                                        recv.put("[ " + region+ "]:#"+datas)
-                                        break
+                                self.heart[fd].reset()
+                                if datas != "heart beat":
+                                    for region, ipaddr  in g_val.whiteName.items():
+                                        if ipaddr == self.fileno_to_ip[fd]:
+                                            recv.put("[ " + region+ " ]:#"+datas)
+                                            break
+                                else:
+                                    self.send_msg[fd] = ["server|heart echo"] 
+                                    self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
+                                    
                                 break
                             else:
                                 self.epoll_fd.unregister(fd)
@@ -109,6 +156,9 @@ class Epoll(object):
                     self.epoll_fd.unregister(fd)
                     self.fileno_to_connection[fd].close()
                     Log.debug("%s closed" % self.fileno_to_ip[fd])
+                    del self.fileno_to_connection[fd]
+                    del self.heart[fd]
+                    del self.fileno_to_ip[fd]
                     break 
                 elif select.EPOLLOUT & events:
                     Log.debug("epoll out  %d" %fd)
@@ -125,6 +175,7 @@ class Epoll(object):
                     break 
                 else:
                     break 
+
 def EpollServer(send, recv, g_val):
     ep = Epoll()
     ep.hanle_event(send, recv, g_val)
