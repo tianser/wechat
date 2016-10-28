@@ -12,6 +12,7 @@ import multiprocessing
 import time
 import Queue
 import common
+import threading
 import signal
 
 class Heart(object):
@@ -37,6 +38,7 @@ class Epoll(object):
         self.fileno_to_ip = {}
         self.send_msg = {}
         self.heart    = {}
+        self.lock  = threading.Lock()
         try:
             self.listen_fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -77,14 +79,21 @@ class Epoll(object):
                     self.epoll_fd.modify(key, select.EPOLLHUP)
             lst = []
             if not send.empty():
+                self.lock.acquire()
                 msg = send.get().split(":")
+                Log.info("msg :%s"% msg)
+                Log.info("fileno_to_ip:%s"% self.fileno_to_ip)
+                Log.info("white_Name %s " % g_val.whiteName)
                 if msg[0] in g_val.whiteName.keys():
                     for fileno, ipaddr in self.fileno_to_ip.items():
                         if ipaddr == g_val.whiteName[ msg[0] ]:
                            self.epoll_fd.modify(fileno, select.EPOLLIN | select.EPOLLOUT)
+                           Log.info("filno: %d send msg: %s" %(fileno, msg[1] ))
                            lst.append(msg[1]) 
-                    if len(lst) > 0: 
-                        self.send_msg[fileno] = lst 
+                           if len(lst) > 0: 
+                               self.send_msg[fileno] = lst 
+                Log.info("self.send_msg===:%s" % self.send_msg)
+                self.lock.release()
             else:
                 time.sleep(1) 
     
@@ -114,6 +123,10 @@ class Epoll(object):
                 if fd == self.listen_fd.fileno():
                     conn, addr = self.listen_fd.accept()
                     Log.debug("accept connection from %s, %d, fd = %d" % (addr[0], addr[1], conn.fileno()))
+                    if addr[0] not in g_val.whiteName.values():
+                        Log.error("unkown connections frome %s, close it" % addr[0])
+                        conn.close() 
+                        break
                     conn.setblocking(0)
                     self.epoll_fd.register(conn.fileno(), select.EPOLLIN | select.EPOLLET)
                     self.fileno_to_connection[conn.fileno()] = conn
@@ -142,8 +155,9 @@ class Epoll(object):
                                             recv.put("[ " + region+ " ]:#"+datas)
                                             break
                                 else:
-                                    self.send_msg[fd] = ["server|heart echo"] 
-                                    self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
+                                    self.fileno_to_connection[fd].sendall("server|heart echo")
+                                    #self.send_msg[fd] = ["server|heart echo"] 
+                                    #self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
                                     
                                 break
                             else:
@@ -161,7 +175,9 @@ class Epoll(object):
                     del self.fileno_to_ip[fd]
                     break 
                 elif select.EPOLLOUT & events:
-                    Log.debug("epoll out  %d" %fd)
+                    Log.debug("epoll out %d" %fd)
+                    self.lock.acquire()
+                    Log.debug("send_msg--===-:%s" % self.send_msg )
                     if fd in self.send_msg.keys():
                         for msg in self.send_msg[fd]:
                             Log.info("send msg:%s" % msg)
@@ -170,7 +186,8 @@ class Epoll(object):
                         del self.send_msg[fd]
                         Log.info("send msg ok")
                     else:
-                        Log.info("send msg empty")
+                        Log.info("send  msg empty")
+                    self.lock.release()
                     self.epoll_fd.modify(fd, select.EPOLLIN | select.EPOLLET)
                     break 
                 else:
@@ -179,48 +196,4 @@ class Epoll(object):
 def EpollServer(send, recv, g_val):
     ep = Epoll()
     ep.hanle_event(send, recv, g_val)
-"""
-    now = time.time()
-    while True:
-        Log.info("process1.....")
-        if time.time() - now >2:
-            now = time.time()
-            Log.info("process1 recv 发送 : 上海 " )
-            recv.put("上海:shanghai")
-            while True:
-                if not send.empty():
-                    Log.info("send 收到: %s" % send.get())
-                else:
-                    Log.info("send empty")
-                    break
-        else:
-            time.sleep(1)
-"""
 
-def process2():
-    now = time.time()
-    while True:
-        if time.time() - now > 30:
-            Log.info("process2  send 发送: TT" )
-            now = time.time()
-            send.put("1:ggg|ceph -s")
-            while True:
-                if not recv.empty():
-                    Log.info("recv收到 :%s" %recv.get())
-                else:
-                    Log.info("recv empty")
-                    break
-        else :
-            time.sleep(3)
-
-if __name__ == "__main__":
-    g_val = common.Global()
-    g_val.GetWhiteName()
-    recv = multiprocessing.Queue()
-    send = multiprocessing.Queue()
-    pw = multiprocessing.Process(target=process1)
-    pr = multiprocessing.Process(target=process2)
-    pw.start()
-    pr.start()
-    pw.join()
-    pr.join()

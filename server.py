@@ -712,6 +712,8 @@ class WebWeixin(object):
             if msgType == 1 and ":" in request_content: 
                 ans = None
                 all_pack = request_content.split(":")
+                for i in g_val.whiteName.keys():
+                    Log.info("region:%s" % i)
                 if all_pack[0] in g_val.whiteName.keys():
                     request_content = all_pack[1] 	
                     if request_content == "help":
@@ -1031,7 +1033,8 @@ def wechatServer(send, recv, g_val):
     webwx.start(send, recv, g_val)
 
 def SigHandler(signum, stack_frame):
-    g_val.ExitFlag.value = 0 
+    Log.info("ExitFlag.value == 1")
+    g_val.ExitFlag.value = 1 
 
 if __name__ == '__main__':
     g_val = common.Global()
