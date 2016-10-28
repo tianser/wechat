@@ -1,4 +1,0 @@
-01:调整是否自动报警#Notify
-02:查看集群状态#ceph -s
-03:查看集群详细状态#ceph health detail
-04:自动修复pg#ceph health detail|grep pg|grep -v pgs|awk '{print $2}'|xargs -n 1 -i ceph pg repair {}
