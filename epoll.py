@@ -14,6 +14,9 @@ import Queue
 import common
 import threading
 import signal
+import json
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 class Heart(object):
     def __init__(self):
@@ -32,8 +35,9 @@ class Heart(object):
             else:
                 time.sleep(3)
 
-class Epoll(object):
+class Epoll(common.SigHandle):
     def __init__(self):
+        super(Epoll, self).__init__()
         self.fileno_to_connection = {}
         self.fileno_to_ip = {}
         self.send_msg = {}
@@ -70,37 +74,62 @@ class Epoll(object):
             Log.error(msg)
             sys.exit(0)
 
-    def Modify(self, send, g_val):
+    def Modify(self, send, recv, g_val):
         while True:
-            if g_val.ExitFlag.value == 1:
+            if self.Flag:
                 thread.exit_thread()
-            for key, value in self.heart.items():
+            for fd, value in self.heart.items():
                 if value.count > 5:
-                    self.epoll_fd.modify(key, select.EPOLLHUP)
+                    self.epoll_fd.unregister(fd)
+                    self.fileno_to_connection[fd].close()
+                    Log.error("heart_beat: %s lost, close it" % self.fileno_to_ip[fd])
+                    for region, ip in g_val.whiteName.items(): 
+                        if ip == self.fileno_to_ip[fd] :
+                            recv.put(common.encodeMsg("@@@@", "heart beat lost", region))
+                            break
+                    del self.fileno_to_connection[fd]
+                    del self.heart[fd]
+                    del self.fileno_to_ip[fd]
+                    #self.epoll_fd.modify(key, select.EPOLLHUP)
             lst = []
-            if not send.empty():
-                self.lock.acquire()
-                msg = send.get().split(":")
-                Log.info("msg :%s"% msg)
-                Log.info("fileno_to_ip:%s"% self.fileno_to_ip)
-                Log.info("white_Name %s " % g_val.whiteName)
-                if msg[0] in g_val.whiteName.keys():
-                    for fileno, ipaddr in self.fileno_to_ip.items():
-                        if ipaddr == g_val.whiteName[ msg[0] ]:
-                           self.epoll_fd.modify(fileno, select.EPOLLIN | select.EPOLLOUT)
-                           Log.info("filno: %d send msg: %s" %(fileno, msg[1] ))
-                           lst.append(msg[1]) 
-                           if len(lst) > 0: 
-                               self.send_msg[fileno] = lst 
-                Log.info("self.send_msg===:%s" % self.send_msg)
-                self.lock.release()
-            else:
-                time.sleep(1) 
+            while True:
+                if not send.empty():
+                    self.lock.acquire()
+                    try:
+                        msg = json.loads(send.get())
+                    except  Exception as e:
+                        Log.error("json parse error, %s" % str(e))
+                        self.lock.release()
+                        continue
+                    if msg["content"] == "Online":
+                        rt = ""
+                        for region, ipaddr in g_val.whiteName.items():
+                            if ipaddr in self.fileno_to_ip.values():
+                                rt = rt + region +" "  
+                        if not rt:
+                            rt = "no region"
+                        recv.put(common.encodeMsg(msg["fromTo"], rt + " online now", msg["sendTo"]))
+                        self.lock.release()
+                        continue
+                    if msg["sendTo"] in g_val.whiteName.keys():
+                        for fileno, ipaddr in self.fileno_to_ip.items():
+                            if ipaddr == g_val.whiteName[ msg["sendTo"] ]:
+                               self.epoll_fd.modify(fileno, select.EPOLLIN | select.EPOLLOUT)
+                               Log.info("filno: %d send msg: %s"%(fileno, msg["content"]))
+                               if fileno in self.send_msg.keys():
+                                   self.send_msg[fileno].append( common.encodeMsg(msg["fromTo"], msg["content"], msg["sendTo"]) )
+                               else:
+                                   lst.append( common.encodeMsg(msg["fromTo"], msg["content"], msg["sendTo"]) )
+                                   self.send_msg[fileno] = lst 
+                    self.lock.release()
+                else:
+                    time.sleep(1) 
+                    break
     
     def HeartBeat(self, g_val):
        run_list = []
        while True:
-           if g_val.ExitFlag.value == 1:
+           if self.Flag:
                thread.exit_thread()
            for id in run_list:
               if id not in self.heart.key():
@@ -111,14 +140,39 @@ class Epoll(object):
                    value.HeartHandle()
            time.sleep(1) 
 
+    def Xhandler(self, signum, frame):
+        common.SigHandle.handler(self, signum, frame)
+        while True:
+            if self.Flag == 2:
+                for fd, conn  in self.fileno_to_connection.items():
+                    self.epoll_fd.unregister(fd)
+                    self.fileno_to_connection[fd].close()
+                    Log.debug("%s closed" % self.fileno_to_ip[fd])
+                    del self.fileno_to_connection[fd]
+                    del self.heart[fd]
+                    del self.fileno_to_ip[fd]
+            else:
+                time.sleep(1)
+
     def hanle_event(self, send, recv, g_val):
         #datalist = {}
         HB = thread.start_new_thread(Epoll.HeartBeat, (self, g_val )) 
-        Modify = thread.start_new_thread(Epoll.Modify, (self, send, g_val)) 
+        Modify = thread.start_new_thread(Epoll.Modify, (self, send, recv, g_val)) 
         while True:
-            if g_val.ExitFlag.value == 1:
+            if self.Flag:
+                Log.info("handle_event exit.....")
+                for fd, conn  in self.fileno_to_connection.items():
+                    self.epoll_fd.unregister(fd)
+                    self.fileno_to_connection[fd].close()
+                    Log.debug("%s ===closed" % self.fileno_to_ip[fd])
+                    del self.fileno_to_connection[fd]
+                    del self.heart[fd]
+                    del self.fileno_to_ip[fd]
                 break
-            epoll_list = self.epoll_fd.poll()
+            try:
+                epoll_list = self.epoll_fd.poll()
+            except IOError:
+                continue
             for fd, events in epoll_list:
                 if fd == self.listen_fd.fileno():
                     conn, addr = self.listen_fd.accept()
@@ -149,16 +203,20 @@ class Epoll(object):
                                 Log.debug("%s receive %s" % (fd, datas))
                                 #self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
                                 self.heart[fd].reset()
-                                if datas != "heart beat":
-                                    for region, ipaddr  in g_val.whiteName.items():
-                                        if ipaddr == self.fileno_to_ip[fd]:
-                                            recv.put("[ " + region+ " ]:#"+datas)
-                                            break
-                                else:
-                                    self.fileno_to_connection[fd].sendall("server|heart echo")
-                                    #self.send_msg[fd] = ["server|heart echo"] 
-                                    #self.epoll_fd.modify(fd, select.EPOLLET | select.EPOLLOUT)
-                                    
+                                try:
+                                    msg = json.loads(datas)
+                                    if msg["content"] == "heart beat":
+                                        self.fileno_to_connection[fd].sendall( common.encodeMsg(msg["sendTo"], "heart echo", msg["fromTo"]) )
+                                        break
+                                    if msg["sendTo"] == "all":
+                                        for region, ipaddr in g_val.whiteName.items():
+                                            if ipaddr == self.fileno_to_ip[fd]:
+                                                msg["sendTo"] = region
+                                                break
+                                        datas = common.encodeMsg(msg["fromTo"], msg["content"], msg["sendTo"])
+                                    recv.put( datas )
+                                except Exception as e:
+                                    Log.error("load parse error, %s" % e)
                                 break
                             else:
                                 self.epoll_fd.unregister(fd)
@@ -175,18 +233,15 @@ class Epoll(object):
                     del self.fileno_to_ip[fd]
                     break 
                 elif select.EPOLLOUT & events:
-                    Log.debug("epoll out %d" %fd)
                     self.lock.acquire()
-                    Log.debug("send_msg--===-:%s" % self.send_msg )
                     if fd in self.send_msg.keys():
                         for msg in self.send_msg[fd]:
-                            Log.info("send msg:%s" % msg)
+                            Log.info("fileno %d, send:%s" %(fd, msg) )
                             #self.fileno_to_connection[fd].send(self.send_msg[fd], len(self.send_msg[fd]))
                             self.fileno_to_connection[fd].sendall(msg)
                         del self.send_msg[fd]
-                        Log.info("send msg ok")
                     else:
-                        Log.info("send  msg empty")
+                        Log.error("send msg empty")
                     self.lock.release()
                     self.epoll_fd.modify(fd, select.EPOLLIN | select.EPOLLET)
                     break 
@@ -196,48 +251,3 @@ class Epoll(object):
 def EpollServer(send, recv, g_val):
     ep = Epoll()
     ep.hanle_event(send, recv, g_val)
-"""
-    now = time.time()
-    while True:
-        Log.info("process1.....")
-        if time.time() - now >2:
-            now = time.time()
-            Log.info("process1 recv 发送 : 上海 " )
-            recv.put("上海:shanghai")
-            while True:
-                if not send.empty():
-                    Log.info("send 收到: %s" % send.get())
-                else:
-                    Log.info("send empty")
-                    break
-        else:
-            time.sleep(1)
-"""
-
-def process2():
-    now = time.time()
-    while True:
-        if time.time() - now > 30:
-            Log.info("process2  send 发送: TT" )
-            now = time.time()
-            send.put("1:ggg|ceph -s")
-            while True:
-                if not recv.empty():
-                    Log.info("recv收到 :%s" %recv.get())
-                else:
-                    Log.info("recv empty")
-                    break
-        else :
-            time.sleep(3)
-
-if __name__ == "__main__":
-    g_val = common.Global()
-    g_val.GetWhiteName()
-    recv = multiprocessing.Queue()
-    send = multiprocessing.Queue()
-    pw = multiprocessing.Process(target=process1)
-    pr = multiprocessing.Process(target=process2)
-    pw.start()
-    pr.start()
-    pw.join()
-    pr.join()

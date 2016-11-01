@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
-import qrcode
 import urllib
 import urllib2
 import cookielib
 import requests
-import xml.dom.minidom
 import json
 import time
 import re
@@ -14,9 +12,6 @@ import os
 import random
 import multiprocessing
 import platform
-from collections import defaultdict
-from urlparse import urlparse
-from lxml import html
 import ConfigParser
 from multiprocessing import Process, Manager, Value
 import epoll
@@ -25,9 +20,17 @@ import common
 import thread
 import signal
 
+sys.path.append("./third-pkg")
+from lxml import html
+from urlparse import urlparse
+from collections import defaultdict
+import qrcode
+import xml.dom.minidom
 # for media upload
 import mimetypes
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 def _decode_list(data):
     rv = []
@@ -57,7 +60,7 @@ def _decode_dict(data):
     return rv
 
 
-class WebWeixin(object):
+class WebWeixin(common.SigHandle):
     def __str__(self):
         description = \
             "=========================\n" + \
@@ -73,6 +76,7 @@ class WebWeixin(object):
         return description
 
     def __init__(self):
+        super(WebWeixin, self).__init__()
         self.DEBUG = False
         self.uuid = ''
         self.base_uri = ''
@@ -136,7 +140,7 @@ class WebWeixin(object):
         #if sys.platform.startswith('win'):
         self._showQRCodeImg()
         #else:
-        self._str2qr('https://login.weixin.qq.com/l/' + self.uuid)
+        #self._str2qr('https://login.weixin.qq.com/l/' + self.uuid)
 
     def _showQRCodeImg(self):
         url = 'https://login.weixin.qq.com/qrcode/' + self.uuid
@@ -712,8 +716,6 @@ class WebWeixin(object):
             if msgType == 1 and ":" in request_content: 
                 ans = None
                 all_pack = request_content.split(":")
-                for i in g_val.whiteName.keys():
-                    Log.info("region:%s" % i)
                 if all_pack[0] in g_val.whiteName.keys():
                     request_content = all_pack[1] 	
                     if request_content == "help":
@@ -726,12 +728,9 @@ class WebWeixin(object):
                                 if line2 != "":
                                     self.command[line1.split(":")[0]] = line2
                                 ans = ans + line1 + "\n"
-                    elif request_content == "00":
-                        g_val.updateconfig.value = 1
-                        ans = "load success"
                     else:
                         if request_content in self.command.keys():
-                            send.put(all_pack[0] +":"+srcName+"|"+self.command[request_content])
+                            send.put( common.encodeMsg(srcName, self.command[request_content], all_pack[0]) ) 
                         else:
                             ans = "command error"
                     self._showMsg(raw_msg)
@@ -745,14 +744,14 @@ class WebWeixin(object):
             else:          #other type msg
                 return None
 
-    def listenMsgMode(self, send, g_val):
+    def ListenMsgMode(self, send, g_val):
         Log.info('listenMsgMode start')
         self._run('testsynccheck', self.testsynccheck)
         playWeChat = 0
         redEnvelope = 0
         self.lastCheckTs = time.time()
         while True:
-            if g_val.ExitFlag.value == 1:
+            if self.Flag:
                 Log.info("Wechat_Server exit listenMsgMode")
                 thread.exit_thread()  
             time.sleep(2)
@@ -829,7 +828,7 @@ class WebWeixin(object):
     #@catchKeyboardInterrupt
     def start(self, send, recv, g_val):
         Log.debug('webweixin start')
-        while True:
+        while True and not self.Flag:
             self._run('genuuid ...', self.getUUID)
             print
             self.genQRCode()
@@ -846,26 +845,28 @@ class WebWeixin(object):
         self._run('notify...', self.webwxstatusnotify)
         self._run('getcontact...', self.webwxgetcontact)
 
-        Listen = thread.start_new_thread(WebWeixin.listenMsgMode, (self, send, g_val))
-        Notify = thread.start_new_thread(WebWeixin.notifyMode, (self, recv, g_val))
-        #该进程处理接收的消息
-        #listenProcess = multiprocessing.Process(target=self.listenMsgMode)
-        #listenProcess.start()
+        with open('./HOWTO', 'r') as f:
+            for line in f.readlines():
+                line1 = line.strip("\n").split("#")[0]
+                line2 = line.strip("\n").split("#")[1] 
+                #更新command
+                if line2 != "":
+                    self.command[line1.split(":")[0]] = line2
 
-        #sendProcess = multiprocessing.Process(target=self.notifyMode)
-        #sendProcess.start()
+        Listen = thread.start_new_thread(WebWeixin.ListenMsgMode, (self, send, g_val))
+        Notify = thread.start_new_thread(WebWeixin.NotifyMode, (self, recv, g_val))
         while True:
-            if g_val.ExitFlag.value == 1:
+            if self.Flag:
                 sys.exit(0)
                 Log.info("WeChat_main_Server exit")
             else:
                 time.sleep(2)
 
-    def notifyMode(self, recv, g_val):
+    def NotifyMode(self, recv, g_val):
         Log.debug("enter notifyMode")
         id = None
         while True:
-            if g_val.ExitFlag.value == 1:
+            if self.Flag:
                 Log.info("WeChat_Server exit notifyMode")
                 thread.exit_thread()  
             if not recv.empty():  
@@ -873,17 +874,27 @@ class WebWeixin(object):
                     with open('./tmp.asok') as f:
                         id = f.readline().strip('\n')
                     os.remove('./tmp.asok')
-                if id:
-                    send_msg = recv.get()	#ggg@ xxxx
-                    if "@" in send_msg:
-                        send_msg = send_msg.split("#")[1]
-                        self.webwxsendmsg("@"+send_msg.split("@")[0] + "\n" + send_msg.split("@")[1], id)
+                send_msg = recv.get()	
+                msg = None
+                try:
+                    msg = json.loads(send_msg)
+                except :
+                    continue
+                if msg:
+                    #msg["fromTo"]: 昵称， msg["sendTo"]: region
+                    if "@@@@" == msg["fromTo"]:
+                        if id:
+                            self.webwxsendmsg("WeChat自动报警-"+ time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())+"-["+msg["sendTo"]+"]:\n" + msg["content"], id)
+                        else:
+                            for name in g_val.member:	#bug
+                                self.sendMsg(name, "Wechat自动报警-"+time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())+"-["+msg["sendTo"]+"]:\n" + msg["content"] )
                     else:
-                        Log.info("send to %s", id)
-                        self.webwxsendmsg("WeChat自动报警-"+ time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())+"-"+ send_msg.split("#")[0] + "\n" + send_msg.split("#")[1], id)
-                else:
-                    for name in g_val.member:	#bug
-                        self.sendMsg(name, "Wechat自动报警:\n" + recv.get())
+                        if id:
+                            self.webwxsendmsg("@"+msg["fromTo"] + "\n" + msg["content"], id)
+                        else:
+                            for name in g_val.member:	#bug
+                                self.sendMsg(name, msg["sendTo"] + "\n"+ msg["content"])
+                    Log.info("send to %s", id)
             else:
                 time.sleep(1)
 
@@ -1032,9 +1043,6 @@ def wechatServer(send, recv, g_val):
     webwx = WebWeixin()
     webwx.start(send, recv, g_val)
 
-def SigHandler(signum, stack_frame):
-    Log.info("ExitFlag.value == 1")
-    g_val.ExitFlag.value = 1 
 
 if __name__ == '__main__':
     g_val = common.Global()
@@ -1046,7 +1054,11 @@ if __name__ == '__main__':
     pr = multiprocessing.Process(target=wechatServer, args=(send, recv, g_val))
     pw.start()
     pr.start()
-    signal.signal(signal.SIGINT, SigHandler)
+    with open('/var/run/pw.pid', 'w') as f:
+        f.write(str(pw.pid))
+
+    with open('/var/run/pr.pid', 'w') as f:
+        f.write(str(pr.pid))
     if not pw.is_alive() and not pr.is_alive():
         Log.info("main process exit")
         sys.exit(0)

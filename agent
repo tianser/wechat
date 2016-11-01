@@ -1,0 +1,52 @@
+#!/bash/bin
+
+function stop()
+{
+    if [ -e /var/run/wechat_agent_pw.pid ]; then
+        pid=`cat /var/run/wechat_agent_pw.pid` 
+        kill -2 $pid
+        rm /var/run/wechat_agent_pw.pid
+    fi
+
+    if [ -e /var/run/wechat_agent_pr.pid ]; then
+        pid=`cat /var/run/wechat_agent_pr.pid`
+        kill -2 $pid
+        rm /var/run/wechat_agent_pr.pid
+    fi
+    echo "agent stopped"
+}
+
+function start()
+{
+    cd /opt/projects/wechat 
+    nohup python agent.py 2>&1 & 
+    cd -
+}
+
+function restart()
+{
+    stop 
+    start
+}
+
+if [ $# -lt 1 ]; then
+    echo "Usage: agent start | stop | restart | help"
+    exit 1
+elif [ $# -gt 1 ]; then 
+    echo "Usage: agent start | stop | restart | help"
+    exit 1
+fi 
+
+if [ $# -eq 1 ]; then
+   if [ "$1" == "help" ]; then
+       echo "Usage: agent start | stop | restart | help"
+   elif [ "$1" == "start" ]; then
+      start
+   elif [ "$1" == "stop" ]; then
+      stop
+   elif [ "$1" == "restart" ];  then
+      restart
+   else
+      echo "Usage: agent start | stop | restart | help"
+   fi
+fi 

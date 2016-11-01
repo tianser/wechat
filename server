@@ -1,0 +1,54 @@
+#!/bash/bin
+
+function stop()
+{
+    if [ -e /var/run/pr.pid ]; then
+        pid=`cat /var/run/pr.pid`
+        kill -2 $pid
+        rm /var/run/pr.pid
+    fi
+    
+    if [ -e /var/run/pw.pid ]; then
+        pid=`cat /var/run/pw.pid`
+        kill -2 $pid
+        rm /var/run/pw.pid
+    fi
+    
+    echo "server stopped"
+}
+
+function start()
+{
+    cd /opt/projects/wechat 
+    nohup python server.py 2>&1 & 
+    cd -
+}
+
+function restart()
+{
+    stop 
+    start
+}
+
+if [ $# -lt 1 ]; then
+    echo "Usage: server start | stop | restart | help"
+    exit 1
+elif [ $# -gt 1 ]; then 
+    echo "Usage: server start | stop | restart | help"
+    exit 1
+fi 
+
+if [ $# -eq 1 ]; then 
+   if [ "$1" == "help" ]; then
+       echo "Usage: server start | stop | restart | help"
+   elif [ "$1" == "start" ]; then
+      start  
+   elif [ "$1" == "stop" ]; then  
+      stop  
+   elif [ "$1" == "restart" ];  then  
+      restart
+   else 
+      echo "Usage: server start | stop | restart | help"
+   fi
+fi
+
