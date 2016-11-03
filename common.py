@@ -31,16 +31,33 @@ def sh_cmd(cmd):
 		return status, "process failed"
 
 class SigHandle(object):
+	"""python signal wrapper"""
+
 	def __init__(self):
+		"""Initialize signal
+		:param Flag: thread Flag 
+		:returns: None
+		"""
 		signal.signal(signal.SIGINT, self.handler)
 		self.Flag = 0 
 
 	def handler(self, signum, frame):
+		"""receive SIGINT,and execute this function
+		alter Flag	
+		"""
 		self.Flag = 1
 		Log.info("signal recv signum: %d" % signum)
 
 class Agent(object):
 	def __init__(self, ConfigFile='./agent.ini'):
+		"""Initialize Agent configure file 
+		:param NotifyFlag: agent do Timer Task or not 
+		:param ExitFlag:   multiprocessing exit or not
+		:Param ServerIp:   wechat server ip address 
+		:param Ip:         agent ip address 
+		:param Myport:     agent tcp port 
+		:returns: None
+		"""
 		self.ConfigFile = ConfigFile 
 		self.NotifyFlag = Value('i', 1)
 		self.ExitFlag   = Value('i', 0)
@@ -52,6 +69,12 @@ class Agent(object):
 
 class Global(object):
 	def __init__(self, configFile='./wechat.ini'):
+		"""Initialize wechat Server configure file 
+		:param IdFlag: wechat send msg to group or my wechat friends setted in configure file 
+		:param updateconfig: discard now 
+		:param ExitFlag: multiprocessing exit or not 
+		:param whiteName: agent region and ip
+		"""
 		self.configFile=configFile
 		self.IdFlag = Value('i', 0)
 		self.updateconfig = Value('i', 0)
@@ -64,6 +87,8 @@ class Global(object):
 		self.member = cf.get("auto_reply", "member").split(";") #list
 
 	def GetWhiteName(self):
+		"""read configure file to initialize whiteName
+		"""
 		cf = ConfigParser.ConfigParser()
 		cf.read(self.configFile)
 		self.regions = cf.get("client_region", "region").split(";")
@@ -71,6 +96,12 @@ class Global(object):
 			self.whiteName[region] = cf.get("client_region", region+"_ip")
 
 def encodeMsg(fromTo, request, sendTo):
+	"""encode msg to json
+	:param fromTo: wechat receive from 
+	:param request: request content 
+	:param sendTo: agent on the region
+	:returns None
+	"""
 	encode = {}
 	encode["fromTo"] = fromTo   #Í«≥∆
 	encode["content"] = request

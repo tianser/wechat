@@ -18,14 +18,22 @@ reload(sys)
 sys.setdefaultencoding('utf8')
 
 class Heart(object):
+    """Heart beat mechanism wrapper, 30seconds"""
     def __init__(self):
+        """Initialize instance
+		:params start: create instance time 
+		:params count: Heart beat counter
+		:returns None
+		"""
         self.start = int(time.time())
         self.count = 0
 
     def reset(self):
+        """reset Heart beat counter"""
         self.count = 0
 
     def HeartHandle(self):
+        """Heart beat count"""
         while True:
             now = int(time.time())
             if now - self.start > 10:
@@ -35,12 +43,22 @@ class Heart(object):
 				time.sleep(3)
 
 class Epoll(object):
+    """ net Events handler wrapper"""
     def __init__(self):
+        """Initialize
+		:params fileno_to_connection: fd and connection 
+		:params heart: heart beat instance 
+		:params send_msg: msg want to send
+		:returns: None
+		"""
         self.fileno_to_connection = {}
         self.heart = {}
         self.send_msg = {}
 
     def bind_and_connect(self):
+        """ bind and connect wechat Server
+		:raise Exception and exit
+		"""
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -76,6 +94,7 @@ class Epoll(object):
             sys.exit(0)          
        
     def reconnect(self):
+        """reconnect wechat server when disconnection"""
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:

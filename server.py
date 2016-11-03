@@ -137,10 +137,8 @@ class WebWeixin(common.SigHandle):
         return False
 
     def genQRCode(self):
-        #if sys.platform.startswith('win'):
         self._showQRCodeImg()
-        #else:
-        #self._str2qr('https://login.weixin.qq.com/l/' + self.uuid)
+        self._str2qr('https://login.weixin.qq.com/l/' + self.uuid)
 
     def _showQRCodeImg(self):
         url = 'https://login.weixin.qq.com/qrcode/' + self.uuid
@@ -830,7 +828,6 @@ class WebWeixin(common.SigHandle):
         Log.debug('webweixin start')
         while True and not self.Flag:
             self._run('genuuid ...', self.getUUID)
-            print
             self.genQRCode()
             print '请使用微信扫描二维码以登录 ... '
             if not self.waitForLogin():
