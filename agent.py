@@ -95,6 +95,7 @@ class Epoll(object):
        
     def reconnect(self):
         """reconnect wechat server when disconnection"""
+		g_val.NotifyFlag.value = 0		#此时无法连接到server端，定时任务关闭
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -128,6 +129,7 @@ class Epoll(object):
         except select.error, msg:
             Log.error(msg)
             return          
+		g_val.NotifyFlag.value = 1		#此时连接到server端，定时任务重新开启
 
     def Modify(self):
         while True:
