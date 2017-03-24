@@ -5,11 +5,15 @@ import thread
 import socket
 import select, errno
 import sys
-from common import Log as Log
+from common import Log 
+from common import sh_cmd
+from net import BaseSocket
+
 from multiprocessing import Process,Queue,Pool, Manager, Value, Array
 import pdb 
 import multiprocessing
 import time
+import datetime
 import common
 import json
 import Queue
@@ -18,22 +22,14 @@ reload(sys)
 sys.setdefaultencoding('utf8')
 
 class Heart(object):
-    """Heart beat mechanism wrapper, 30seconds"""
     def __init__(self):
-        """Initialize instance
-		:params start: create instance time 
-		:params count: Heart beat counter
-		:returns None
-		"""
         self.start = int(time.time())
         self.count = 0
 
     def reset(self):
-        """reset Heart beat counter"""
         self.count = 0
 
     def HeartHandle(self):
-        """Heart beat count"""
         while True:
             now = int(time.time())
             if now - self.start > 10:
@@ -43,22 +39,12 @@ class Heart(object):
 				time.sleep(3)
 
 class Epoll(object):
-    """ net Events handler wrapper"""
     def __init__(self):
-        """Initialize
-		:params fileno_to_connection: fd and connection 
-		:params heart: heart beat instance 
-		:params send_msg: msg want to send
-		:returns: None
-		"""
         self.fileno_to_connection = {}
         self.heart = {}
         self.send_msg = {}
 
     def bind_and_connect(self):
-        """ bind and connect wechat Server
-		:raise Exception and exit
-		"""
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -94,8 +80,6 @@ class Epoll(object):
             sys.exit(0)          
        
     def reconnect(self):
-        """reconnect wechat server when disconnection"""
-		g_val.NotifyFlag.value = 0		#此时无法连接到server端，定时任务关闭
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         except socket.error, msg:
@@ -129,7 +113,6 @@ class Epoll(object):
         except select.error, msg:
             Log.error(msg)
             return          
-		g_val.NotifyFlag.value = 1		#此时连接到server端，定时任务重新开启
 
     def Modify(self):
         while True:
@@ -249,11 +232,26 @@ class Epoll(object):
                     time.sleep(1)
                     break
 
+# now = datetime.datetime.strptime(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())), "%Y-%m-%d %H:%M:%S")
+# zero = now.strftime('%Y-%m-%d 00:00:00')
+# delta = now -zero # datetime.timedelta()
 def handle(signum, stack_frame):
+    now = datetime.datetime.strptime(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), "%Y-%m-%d %H:%M:%S")
+    _zero = now.strftime('%Y-%m-%d 00:00:00')
+    zero = datetime.datetime.strptime(_zero, "%Y-%m-%d %H:%M:%S")
+    delta = now - zero
+    if delta > datetime.timedelta(hours=10, minutes=15) and  delta < datetime.timedelta(hours=10, minutes=24) :
+        status, msg = common.sh_cmd("ceph -s")
+        send.put( common.encodeMsg("@@@@", "alarm erveryDay:\n"+msg, "all") )
+        signal.alarm(300)
+     
     if g_val.NotifyFlag.value:
         status, output = common.sh_cmd("ceph health detail")
         Log.info(":%s" % output)
         if output != "HEALTH_OK":
+            if "osds are down" in output:
+                Log.info("osd down:%s " % output)
+                status, msg = common.sh_cmd("ceph osd unset norecover && ceph osd unset noscrub && ceph osd unset nodeep-scrub") 
             status, msg = common.sh_cmd("ceph -s")
             Log.info("msg %s" % msg)
             send.put( common.encodeMsg("@@@@", msg, "all") )
@@ -278,6 +276,7 @@ def HandleMsg():
 def SigHandler(signum, stack_frame):
     g_val.ExitFlag.value = 1
 
+'''
 if __name__ == "__main__":
     g_val = common.Agent()
     recv = multiprocessing.Queue()
@@ -296,3 +295,12 @@ if __name__ == "__main__":
         sys.exit(0)
     #pw.join()
     #pr.join()
+'''
+
+if __name__ == "__main__":
+	Log.info('test error')	
+	#sh.sh_cmd("ls -l")
+	sh_cmd("ls -l")
+	Log.info('test --- error')	
+	#base = BaseSocket()
+	#base.test()

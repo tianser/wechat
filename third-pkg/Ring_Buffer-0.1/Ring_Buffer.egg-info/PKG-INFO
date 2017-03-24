@@ -1,0 +1,18 @@
+Metadata-Version: 1.1
+Name: Ring-Buffer
+Version: 0.1
+Summary: A circular/ring buffer written in C
+Home-page: https://github.com/sirlark/pyringbuf
+Author: James Dominy
+Author-email: UNKNOWN
+License: MIT
+Description: UNKNOWN
+Keywords: circular ring buffer
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: C
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: Implementation :: CPython

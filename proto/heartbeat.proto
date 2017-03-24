@@ -1,0 +1,11 @@
+message heart{
+	required string region = 1;		//区域
+	optional int32  timestamp = 2;  // 时间戳
+}
+
+message heart_back{
+	required int32 result = 1;  //返回结果
+	optional int32 timestamp = 2; 
+}
+
+
